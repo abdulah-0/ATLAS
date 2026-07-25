@@ -210,6 +210,26 @@ export default function SettingsScreen() {
               />
             </View>
 
+            {/* Supabase Keys */}
+            <View style={styles.inputGroup}>
+              <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Project URL</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                value="https://your-supabase-project.supabase.co"
+                placeholderTextColor="#666"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Anon Key</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                secureTextEntry
+                placeholderTextColor="#666"
+              />
+            </View>
+
             {saveStatus && (
               <ThemedText type="smallBold" style={{ color: '#00E676', textAlign: 'center', marginVertical: Spacing.one }}>
                 {saveStatus}
