@@ -37,34 +37,36 @@ export default function TradeFeedScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
 
-        {/* Filter Bar Header */}
-        <View style={styles.filterHeader}>
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
-            onPress={() => setFilter('all')}
-          >
-            <ThemedText type="smallBold" style={{ color: filter === 'all' ? '#000' : '#8E8E93', fontSize: 11 }}>
-              ALL TRADES ({trades.length})
-            </ThemedText>
-          </TouchableOpacity>
+        {/* Filter Bar Header - Scrollable to prevent horizontal overflow */}
+        <View style={styles.filterHeaderWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterHeader}>
+            <TouchableOpacity 
+              style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
+              onPress={() => setFilter('all')}
+            >
+              <ThemedText type="smallBold" style={{ color: filter === 'all' ? '#000' : '#8E8E93', fontSize: 11 }}>
+                ALL TRADES ({trades.length})
+              </ThemedText>
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'wins' && styles.filterChipActive]}
-            onPress={() => setFilter('wins')}
-          >
-            <ThemedText type="smallBold" style={{ color: filter === 'wins' ? '#000' : '#8E8E93', fontSize: 11 }}>
-              WINS ONLY
-            </ThemedText>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, filter === 'wins' && styles.filterChipActive]}
+              onPress={() => setFilter('wins')}
+            >
+              <ThemedText type="smallBold" style={{ color: filter === 'wins' ? '#000' : '#8E8E93', fontSize: 11 }}>
+                WINS ONLY
+              </ThemedText>
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'losses' && styles.filterChipActive]}
-            onPress={() => setFilter('losses')}
-          >
-            <ThemedText type="smallBold" style={{ color: filter === 'losses' ? '#000' : '#8E8E93', fontSize: 11 }}>
-              LOSSES ONLY
-            </ThemedText>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, filter === 'losses' && styles.filterChipActive]}
+              onPress={() => setFilter('losses')}
+            >
+              <ThemedText type="smallBold" style={{ color: filter === 'losses' ? '#000' : '#8E8E93', fontSize: 11 }}>
+                LOSSES ONLY
+              </ThemedText>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -109,7 +111,7 @@ export default function TradeFeedScreen() {
                         </ThemedText>
                       </View>
 
-                      <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
+                      <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                         <ThemedText type="subtitle" style={{ color: isWin ? '#00E676' : '#FF1744' }}>
                           {isWin ? '+' : ''}{pnlPct.toFixed(2)}%
                         </ThemedText>
@@ -119,7 +121,7 @@ export default function TradeFeedScreen() {
                       </View>
                     </View>
 
-                    {/* Price Levels Row */}
+                    {/* Price Levels Row - Responsive flexWrap */}
                     <View style={styles.priceRow}>
                       <ThemedText type="small" style={{ opacity: 0.7 }}>
                         Entry: ${trade.entry_price}
@@ -158,77 +160,85 @@ export default function TradeFeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#101113',
   },
   safeArea: {
     flex: 1,
   },
-  filterHeader: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    padding: Spacing.three,
+  filterHeaderWrapper: {
     backgroundColor: '#161719',
     borderBottomWidth: 1,
     borderBottomColor: '#2D3035',
   },
+  filterHeader: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+  },
   filterChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Spacing.four,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: '#2A2C30',
   },
   filterChipActive: {
     backgroundColor: '#FF9900',
   },
   scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.three,
+    padding: 12,
+    gap: 12,
   },
   emptyCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.three,
+    padding: 16,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
     alignItems: 'center',
-    marginTop: Spacing.two,
+    marginTop: 8,
   },
   tradeCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.two,
+    gap: 8,
   },
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
   },
   badgeRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 6,
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   dirBadge: {
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: Spacing.half,
+    borderRadius: 4,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: Spacing.one,
+    alignItems: 'center',
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#25272B',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   expandedSection: {
-    marginTop: Spacing.one,
+    marginTop: 4,
   },
   divider: {
     height: 1,
     backgroundColor: '#2D3035',
-    marginBottom: Spacing.two,
+    marginBottom: 8,
   },
   reasoningText: {
     fontStyle: 'italic',

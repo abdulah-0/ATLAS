@@ -43,7 +43,7 @@ export default function MissionControlScreen() {
         const activeBots = await dbOperations.getActiveBots();
         setBotsCount(activeBots.length);
       } catch (dbErr) {
-        setBotsCount(2); // Seed count fallback
+        setBotsCount(2);
       }
 
       // 4. Load BTC stack total
@@ -77,29 +77,31 @@ export default function MissionControlScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-          {/* Header Bar */}
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, flexShrink: 1 }}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>ATLAS AUTONOMOUS AGENT</ThemedText>
-              <ThemedText type="subtitle" numberOfLines={1}>Mission Control</ThemedText>
+          {/* Clean Prominent Header */}
+          <View style={styles.headerBlock}>
+            <View style={styles.topMetaRow}>
+              <ThemedText type="small" style={styles.subTag}>ATLAS AUTONOMOUS AGENT</ThemedText>
+              <TouchableOpacity
+                style={[styles.modeBadge, isPaperMode ? styles.paperBadge : styles.liveBadge]}
+                onPress={() => router.push('/settings')}
+              >
+                <View style={[styles.modeDot, { backgroundColor: isPaperMode ? '#FF9900' : '#00E676' }]} />
+                <ThemedText type="smallBold" style={{ color: isPaperMode ? '#FF9900' : '#00E676', fontSize: 10 }}>
+                  {isPaperMode ? 'PAPER DEMO' : 'LIVE'}
+                </ThemedText>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.modeBadge, isPaperMode ? styles.paperBadge : styles.liveBadge]}
-              onPress={() => router.push('/settings')}
-            >
-              <View style={[styles.modeDot, { backgroundColor: isPaperMode ? '#FF9900' : '#00E676' }]} />
-              <ThemedText type="smallBold" style={{ color: isPaperMode ? '#FF9900' : '#00E676', fontSize: 11 }}>
-                {isPaperMode ? 'PAPER DEMO' : 'LIVE'}
-              </ThemedText>
-            </TouchableOpacity>
+            <ThemedText style={styles.mainTitleText}>
+              Mission Control
+            </ThemedText>
           </View>
 
           {/* Missing Keys Setup Banner */}
           {hasKeys === false && (
             <TouchableOpacity style={styles.setupBanner} onPress={() => router.push('/settings')}>
               <View style={styles.setupBannerContent}>
-                <ThemedText type="subtitle" style={{ color: '#000', fontSize: 15 }}>
+                <ThemedText type="subtitle" style={{ color: '#000', fontSize: 14 }}>
                   ⚡ API Keys Required to Start Paper Trading
                 </ThemedText>
                 <ThemedText type="small" style={{ color: '#111', marginTop: 2 }}>
@@ -131,20 +133,20 @@ export default function MissionControlScreen() {
           <View style={styles.metricsGrid}>
             <ThemedView type="backgroundElement" style={styles.metricCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>PORTFOLIO EQUITY</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18, marginTop: 4 }}>
+              <ThemedText type="subtitle" style={styles.metricValText}>
                 ${account ? parseFloat(account.equity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '100,000.00'}
               </ThemedText>
-              <ThemedText type="small" style={{ color: '#00E676', marginTop: 2 }}>
-                {isPaperMode ? 'Alpaca Paper Buying Power' : 'Live Buying Power'}
+              <ThemedText type="small" style={{ color: '#00E676', marginTop: 2, fontSize: 11 }}>
+                Alpaca Paper Account
               </ThemedText>
             </ThemedView>
 
             <ThemedView type="backgroundElement" style={styles.metricCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>MARKET REGIME</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18, color: '#00E676', marginTop: 4 }}>
+              <ThemedText type="subtitle" style={{ fontSize: 16, color: '#00E676', marginTop: 4 }}>
                 {regime ? regime.regime : 'BULL'}
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2 }}>
+              <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2, fontSize: 11 }}>
                 Confidence: {regime ? (regime.confidence * 100).toFixed(0) : '85'}%
               </ThemedText>
             </ThemedView>
@@ -161,18 +163,18 @@ export default function MissionControlScreen() {
 
             <View style={styles.botSummaryRow}>
               <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 24 }}>{botsCount || 2}</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>Active Genomes</ThemedText>
+                <ThemedText type="title" style={{ fontSize: 22 }}>{botsCount || 2}</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Active Genomes</ThemedText>
               </View>
 
               <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 24, color: '#00E676' }}>0</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>Open Positions</ThemedText>
+                <ThemedText type="title" style={{ fontSize: 22, color: '#00E676' }}>0</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Open Positions</ThemedText>
               </View>
 
               <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 24, color: '#FF9900' }}>100%</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>Risk Compliance</ThemedText>
+                <ThemedText type="title" style={{ fontSize: 22, color: '#FF9900' }}>100%</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Risk Compliance</ThemedText>
               </View>
             </View>
           </ThemedView>
@@ -197,27 +199,43 @@ export default function MissionControlScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#101113',
   },
   safeArea: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.three,
+    padding: 14,
+    gap: 12,
   },
-  headerRow: {
+  headerBlock: {
+    marginTop: 4,
+    marginBottom: 4,
+    gap: 4,
+  },
+  topMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.one,
+  },
+  subTag: {
+    opacity: 0.6,
+    fontSize: 11,
+    letterSpacing: 0.8,
+  },
+  mainTitleText: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 2,
   },
   modeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
     borderWidth: 1,
   },
   paperBadge: {
@@ -235,19 +253,19 @@ const styles = StyleSheet.create({
   },
   setupBanner: {
     backgroundColor: '#FF9900',
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
+    borderRadius: 12,
+    padding: 12,
   },
   setupBannerContent: {
     gap: 2,
   },
   heroCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.one,
+    gap: 6,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -260,7 +278,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   btcTitleText: {
-    fontSize: 28,
+    fontSize: 26,
     marginVertical: 2,
   },
   progressTrackBg: {
@@ -268,7 +286,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#2A2C30',
     overflow: 'hidden',
-    marginTop: Spacing.one,
+    marginTop: 6,
   },
   progressTrackFill: {
     height: '100%',
@@ -277,24 +295,27 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 10,
   },
   metricCard: {
     flex: 1,
-    flexShrink: 1,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
   },
+  metricValText: {
+    fontSize: 16,
+    marginTop: 4,
+  },
   sectionCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.two,
+    gap: 12,
   },
   botSummaryRow: {
     flexDirection: 'row',
@@ -306,13 +327,13 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 10,
   },
   actionBtn: {
     flex: 1,
     backgroundColor: '#2A2C30',
-    padding: Spacing.three,
-    borderRadius: Spacing.two,
+    padding: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
 });

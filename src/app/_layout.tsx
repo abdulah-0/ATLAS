@@ -1,8 +1,12 @@
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 export default function RootLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 16);
+
   return (
     <>
       <AnimatedSplashOverlay />
@@ -14,9 +18,10 @@ export default function RootLayout() {
           tabBarStyle: {
             backgroundColor: '#161719',
             borderTopColor: '#2D3035',
-            height: 60,
-            paddingBottom: 8,
+            height: 56 + bottomPadding,
+            paddingBottom: bottomPadding,
             paddingTop: 6,
+            elevation: 8,
           },
           tabBarLabelStyle: {
             fontSize: 10,

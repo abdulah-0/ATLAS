@@ -63,7 +63,7 @@ export default function BtcStackScreen() {
               <View style={[styles.progressBarFill, { width: `${Math.max(2, progressPct)}%` }]} />
             </View>
 
-            {/* Milestones Row */}
+            {/* Milestones Row - Responsive flexWrap */}
             <View style={styles.milestonesRow}>
               {milestones.map((m, idx) => {
                 const isAchieved = totalBtc >= m;
@@ -78,22 +78,22 @@ export default function BtcStackScreen() {
             </View>
           </ThemedView>
 
-          {/* Metrics Grid */}
+          {/* Metrics Grid - Responsive flexWrap */}
           <View style={styles.metricsRow}>
             <ThemedView type="backgroundElement" style={styles.metricCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>TARGET GOAL</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18, marginTop: 2 }}>
+              <ThemedText type="subtitle" style={{ fontSize: 16, marginTop: 2 }}>
                 20.0000 <ThemedText type="small" style={{ color: '#FF9900' }}>BTC</ThemedText>
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2 }}>North Star Capital Target</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2, fontSize: 11 }}>North Star Target</ThemedText>
             </ThemedView>
 
             <ThemedView type="backgroundElement" style={styles.metricCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>SPLIT RULE</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18, color: '#00E676', marginTop: 2 }}>
+              <ThemedText type="subtitle" style={{ fontSize: 16, color: '#00E676', marginTop: 2 }}>
                 80% / 20%
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2 }}>80% Profit -&gt; BTC Stack</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2, fontSize: 11 }}>80% Profit -&gt; BTC Stack</ThemedText>
             </ThemedView>
           </View>
 
@@ -115,7 +115,7 @@ export default function BtcStackScreen() {
             conversions.map((item) => (
               <ThemedView key={item.id} type="backgroundElement" style={styles.ledgerCard}>
                 <View style={styles.ledgerRow}>
-                  <View>
+                  <View style={{ flexShrink: 1 }}>
                     <ThemedText type="default" style={{ color: '#FF9900', fontWeight: 'bold' }}>
                       +{item.btc_amount.toFixed(6)} BTC
                     </ThemedText>
@@ -124,7 +124,7 @@ export default function BtcStackScreen() {
                     </ThemedText>
                   </View>
 
-                  <View style={{ alignItems: 'flex-end' }}>
+                  <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                     <ThemedText type="default" style={{ fontWeight: 'bold' }}>
                       ${item.usd_spent.toFixed(2)} USD
                     </ThemedText>
@@ -146,28 +146,32 @@ export default function BtcStackScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#101113',
   },
   safeArea: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.three,
+    padding: 12,
+    gap: 12,
   },
   header: {
-    marginTop: Spacing.one,
+    marginTop: 4,
   },
   heroCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.one,
+    gap: 6,
   },
   heroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
   },
   heroSubTitle: {
     opacity: 0.6,
@@ -175,14 +179,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   btcVal: {
-    fontSize: 28,
+    fontSize: 26,
   },
   progressBarBg: {
     height: 8,
     borderRadius: 4,
     backgroundColor: '#2E3135',
     overflow: 'hidden',
-    marginTop: Spacing.one,
+    marginTop: 6,
   },
   progressBarFill: {
     height: '100%',
@@ -191,14 +195,14 @@ const styles = StyleSheet.create({
   },
   milestonesRow: {
     flexDirection: 'row',
-    marginTop: Spacing.two,
+    marginTop: 8,
     flexWrap: 'wrap',
-    gap: Spacing.one,
+    gap: 6,
   },
   milestoneChip: {
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: Spacing.four,
+    borderRadius: 12,
     backgroundColor: '#2A2C30',
   },
   milestoneChipAchieved: {
@@ -206,31 +210,31 @@ const styles = StyleSheet.create({
   },
   metricsRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 10,
   },
   metricCard: {
     flex: 1,
     flexShrink: 1,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
   },
   sectionHeader: {
-    marginTop: Spacing.one,
+    marginTop: 4,
   },
   emptyCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.three,
+    padding: 16,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
     alignItems: 'center',
   },
   ledgerCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
@@ -239,5 +243,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
 });
