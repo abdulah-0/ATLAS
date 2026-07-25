@@ -48,15 +48,15 @@ We have divided the implementation of ATLAS into 5 sequential phases based on th
 - [x] Genome auto-mutation and safety rollback mechanism (`rollback.ts`: 15-trade post-mutation performance tracking, auto-rollback if win rate drops >10%).
 - [x] Trade Feed Screen UI (`trade_feed.tsx`: detailed chronological list, filter chips, expandable Opus reasoning, top Pinecone RAG matches, Sonnet reflections).
 
-### 🟩 Phase 4: Risk Management & Profit Compounding
+### ✅ Phase 4: Risk Management & Profit Compounding
 *Enforce financial safety limits and build the BTC conversion mechanism.*
-- [ ] TypeScript Hard Risk Engine (mandatory stop loss, max 20% size, 1% portfolio risk, daily/drawdown halts).
-- [ ] Dynamic position sizing gated by Opus confidence scores and regime multipliers.
-- [ ] BTC Conversion Engine (80% profit conversion queue, dip-aware execution, SQLite audit trail).
-- [ ] Daily High-Water Mark profit lock protection (stop loss tightening logic).
-- [ ] BTC Stack Screen UI (progress bar towards 20 BTC target, cost-basis, conversion history).
+- [x] TypeScript Hard Risk Engine (`riskEngine.ts`: 9 code-level rules: mandatory stop loss, max 20% size, 1% portfolio risk, 5% daily loss halt, 20% drawdown circuit breaker, correlation guard, CRASH regime lock, stock earnings blackout, breaking news pause).
+- [x] Dynamic position sizing (`sizing.ts`: confidence-gated tiers <0.50->0%, 0.50-0.64->5%, 0.65-0.74->10%, 0.75-0.84->15%, 0.85-1.00->20% & regime multipliers).
+- [x] BTC Conversion Engine (`btcConversion.ts`: 80/20 profit conversion queue, >0.8% dip-aware execution, $5 minimum threshold, SQLite `btc_stack` logging).
+- [x] Daily High-Water Mark profit lock protection (`profitLock.ts`: 70% peak gain floor protection, dynamic stop tightening).
+- [x] BTC Stack Screen UI (`btc_stack.tsx`: 20 BTC progress bar, milestone chips 0.1/0.5/1/5/10/20 BTC, cost-basis, conversion history ledger).
 
-### ⬜ Phase 5: UI Polish, Testing & Deployment
+### 🟩 Phase 5: UI Polish, Testing & Deployment
 *Refine UX, run validation suites, and prepare for production launch.*
 - [ ] Intelligence Screen UI (regime transition history chart, live news feed, Fear & Greed index).
 - [ ] Settings Screen UI (encrypted API keys input, Emergency Stop button, paper/live mode toggle).
@@ -93,4 +93,11 @@ We have divided the implementation of ATLAS into 5 sequential phases based on th
 - **UI:** Implemented interactive Trade Feed Screen (`src/app/trade_feed.tsx`) with filter chips (All/Wins/Losses), expandable trade cards, full Opus pre-trade decision reasoning, top-3 Pinecone RAG matches, and Sonnet reflections.
 - **Validation:** Executed `test-phase3.ts` test suite (`PASSED`). Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
 - **Git Commit:** Pushed Phase 3 codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 3 complete. Ready to begin Phase 4.
+- **Status:** Phase 3 complete.
+
+### [2026-07-25] Phase 4: Risk Management & Profit Compounding Complete
+- **Action:** Created `sizing.ts` for confidence-gated position sizing and regime multipliers, `riskEngine.ts` implementing the 9 immutable hard risk rules at code level, `btcConversion.ts` for 80/20 profit splitting, >0.8% dip-aware execution, and SQLite `btc_stack` logging, and `profitLock.ts` protecting 70% of peak daily gains via dynamic stop loss floors.
+- **UI:** Implemented interactive BTC Stack Screen (`src/app/btc_stack.tsx`) with hero 20 BTC progress bar, milestone badges (0.1, 0.5, 1, 5, 10, 20 BTC), weighted average cost-basis, and conversion history ledger.
+- **Validation:** Executed `test-phase4.ts` test suite (`PASSED`). Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
+- **Git Commit:** Pushed Phase 4 codebase to `https://github.com/abdulah-0/ATLAS.git`.
+- **Status:** Phase 4 complete. Ready to begin Phase 5.
