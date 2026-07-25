@@ -105,6 +105,10 @@ export const alpaca = {
   // Config state
   isLive: false, // Default to Paper Trading for safety
 
+  setMode(isLive: boolean): void {
+    this.isLive = isLive;
+  },
+
   getBaseUrl(): string {
     return this.isLive 
       ? 'https://api.alpaca.markets' 
