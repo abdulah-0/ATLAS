@@ -59,12 +59,12 @@ export default function IntelligenceScreen() {
             <View style={styles.regimeMainRow}>
               <View style={styles.regimeBadgeGroup}>
                 <View style={[styles.regimeDot, { backgroundColor: getRegimeColor(currentRegimeName) }]} />
-                <ThemedText type="title" style={{ color: getRegimeColor(currentRegimeName), fontSize: 28 }}>
+                <ThemedText type="title" style={{ color: getRegimeColor(currentRegimeName), fontSize: 26 }}>
                   {currentRegimeName}
                 </ThemedText>
               </View>
 
-              <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                 <ThemedText type="subtitle" style={{ color: '#FF9900' }}>
                   {confidencePct}% CONF
                 </ThemedText>
@@ -74,12 +74,12 @@ export default function IntelligenceScreen() {
 
             <View style={styles.regimeStatsRow}>
               <View style={styles.regimeStatCol}>
-                <ThemedText type="small" style={{ opacity: 0.5 }}>POSITION MULTIPLIER</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.5 }} numberOfLines={1}>POSITION MULTIPLIER</ThemedText>
                 <ThemedText type="smallBold">1.0x (100% Sizing)</ThemedText>
               </View>
 
               <View style={styles.regimeStatCol}>
-                <ThemedText type="small" style={{ opacity: 0.5 }}>RISK COMPLIANCE</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.5 }} numberOfLines={1}>RISK COMPLIANCE</ThemedText>
                 <ThemedText type="smallBold" style={{ color: '#00E676' }}>100% CLEAR</ThemedText>
               </View>
             </View>
@@ -90,7 +90,7 @@ export default function IntelligenceScreen() {
             {/* Fear & Greed Card */}
             <ThemedView type="backgroundElement" style={styles.gridCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>FEAR & GREED INDEX</ThemedText>
-              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 22, marginVertical: 2 }}>
+              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 20, marginVertical: 2 }}>
                 68
               </ThemedText>
               <ThemedText type="smallBold" style={{ color: '#00E676' }}>
@@ -101,10 +101,10 @@ export default function IntelligenceScreen() {
             {/* Macro Status Card */}
             <ThemedView type="backgroundElement" style={styles.gridCard}>
               <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>MACRO BLACKOUT</ThemedText>
-              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 22, marginVertical: 2 }}>
+              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 20, marginVertical: 2 }}>
                 CLEAR
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>No Earnings Risk</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>No Earnings Risk</ThemedText>
             </ThemedView>
           </View>
 
@@ -113,19 +113,21 @@ export default function IntelligenceScreen() {
             <ThemedText type="smallBold" style={{ opacity: 0.7 }}>LIVE MARKET INTELLIGENCE FEED</ThemedText>
           </View>
 
-          {/* Filter Chips */}
-          <View style={styles.filterRow}>
-            {(['ALL', 'BTC', 'ETH', 'NVDA'] as const).map(asset => (
-              <TouchableOpacity
-                key={asset}
-                style={[styles.filterChip, assetFilter === asset && styles.filterChipActive]}
-                onPress={() => setAssetFilter(asset)}
-              >
-                <ThemedText type="smallBold" style={{ color: assetFilter === asset ? '#000' : '#8E8E93', fontSize: 11 }}>
-                  {asset}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
+          {/* Filter Chips - Scrollable to prevent horizontal overflow */}
+          <View style={styles.filterRowWrapper}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {(['ALL', 'BTC', 'ETH', 'NVDA'] as const).map(asset => (
+                <TouchableOpacity
+                  key={asset}
+                  style={[styles.filterChip, assetFilter === asset && styles.filterChipActive]}
+                  onPress={() => setAssetFilter(asset)}
+                >
+                  <ThemedText type="smallBold" style={{ color: assetFilter === asset ? '#000' : '#8E8E93', fontSize: 11 }}>
+                    {asset}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
 
           <ThemedView type="backgroundElement" style={styles.newsCard}>
@@ -157,38 +159,42 @@ export default function IntelligenceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#101113',
   },
   safeArea: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.three,
+    padding: 12,
+    gap: 12,
   },
   header: {
-    marginTop: Spacing.one,
+    marginTop: 4,
   },
   heroCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.two,
+    gap: 10,
   },
   heroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   regimeMainRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   regimeBadgeGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: 8,
+    flexShrink: 1,
   },
   regimeDot: {
     width: 12,
@@ -197,64 +203,69 @@ const styles = StyleSheet.create({
   },
   regimeStatsRow: {
     flexDirection: 'row',
-    paddingTop: Spacing.two,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#2D3035',
-    gap: Spacing.three,
+    gap: 10,
   },
   regimeStatCol: {
     flex: 1,
+    flexShrink: 1,
   },
   gridRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 10,
   },
   gridCard: {
     flex: 1,
     flexShrink: 1,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
   },
   sectionHeader: {
-    marginTop: Spacing.one,
+    marginTop: 4,
+  },
+  filterRowWrapper: {
+    marginVertical: 2,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: 8,
   },
   filterChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Spacing.four,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: '#2A2C30',
   },
   filterChipActive: {
     backgroundColor: '#FF9900',
   },
   newsCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
   },
   newsItem: {
-    paddingVertical: Spacing.one,
+    paddingVertical: 4,
   },
   newsMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    marginBottom: Spacing.half,
+    gap: 8,
+    marginBottom: 4,
+    flexWrap: 'wrap',
   },
   breakingTag: {
     backgroundColor: '#00E676',
-    paddingHorizontal: Spacing.one,
+    paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: Spacing.half,
+    borderRadius: 4,
   },
   headlineText: {
     fontSize: 13,
