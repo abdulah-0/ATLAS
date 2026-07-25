@@ -1,62 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { dbOperations } from '../services/db';
 
-interface BtcConversionRecord {
-  id: number;
-  btc_amount: number;
-  usd_spent: number;
-  btc_price_at_buy: number;
-  source_trade_id: string | null;
-  purchased_at: string;
-}
-
 export default function BtcStackScreen() {
-  const [btcPrice] = useState(67420.00); // Live price fallback
+  const [btcPrice] = useState(67420.00);
+  const [totalBtc, setTotalBtc] = useState<number>(0);
+  const [conversions, setConversions] = useState<any[]>([]);
 
-  // Mock / Initial Conversion Ledger State
-  const [conversions] = useState<BtcConversionRecord[]>([
-    {
-      id: 1,
-      btc_amount: 0.00169120,
-      usd_spent: 114.00,
-      btc_price_at_buy: 67410.00,
-      source_trade_id: 'tr_1092',
-      purchased_at: '2 hours ago',
-    },
-    {
-      id: 2,
-      btc_amount: 0.00284500,
-      usd_spent: 185.50,
-      btc_price_at_buy: 65200.00,
-      source_trade_id: 'tr_1084',
-      purchased_at: '3 days ago',
-    },
-    {
-      id: 3,
-      btc_amount: 0.00492000,
-      usd_spent: 310.00,
-      btc_price_at_buy: 63008.00,
-      source_trade_id: 'tr_1070',
-      purchased_at: '1 week ago',
-    }
-  ]);
-
-  // Milestone target list
   const milestones = [0.1, 0.5, 1.0, 5.0, 10.0, 20.0];
 
-  // Aggregates
-  const totalBtc = conversions.reduce((sum, c) => sum + c.btc_amount, 0);
-  const totalUsdSpent = conversions.reduce((sum, c) => sum + c.usd_spent, 0);
-  const currentUsdValue = totalBtc * btcPrice;
-  const weightedCostBasis = totalBtc > 0 ? totalUsdSpent / totalBtc : 0;
-  const totalStackProfitUsd = currentUsdValue - totalUsdSpent;
-  const totalStackProfitPct = totalUsdSpent > 0 ? (totalStackProfitUsd / totalUsdSpent) * 100 : 0;
+  useEffect(() => {
+    loadBtcStackFromDb();
+  }, []);
 
+  const loadBtcStackFromDb = async () => {
+    try {
+      const btcTotal = await dbOperations.getBtcStackTotal();
+      setTotalBtc(btcTotal);
+    } catch (e) {
+      setTotalBtc(0);
+    }
+  };
+
+  const currentUsdValue = totalBtc * btcPrice;
   const targetBtc = 20.0;
   const progressPct = Math.min(100, (totalBtc / targetBtc) * 100);
 
@@ -84,7 +54,7 @@ export default function BtcStackScreen() {
               {totalBtc.toFixed(6)} <ThemedText type="subtitle" style={{ color: '#FF9900' }}>BTC</ThemedText>
             </ThemedText>
 
-            <ThemedText type="subtitle" style={{ color: '#00E676', marginTop: -Spacing.one }}>
+            <ThemedText type="subtitle" style={{ color: '#00E676', marginTop: -4 }}>
               ≈ ${currentUsdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
             </ThemedText>
 
@@ -111,63 +81,61 @@ export default function BtcStackScreen() {
           {/* Metrics Grid */}
           <View style={styles.metricsRow}>
             <ThemedView type="backgroundElement" style={styles.metricCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>COST BASIS (AVG)</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18 }}>
-                ${weightedCostBasis.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>TARGET GOAL</ThemedText>
+              <ThemedText type="subtitle" style={{ fontSize: 18, marginTop: 2 }}>
+                20.0000 <ThemedText type="small" style={{ color: '#FF9900' }}>BTC</ThemedText>
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>Total Spent: ${totalUsdSpent.toFixed(2)}</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2 }}>North Star Capital Target</ThemedText>
             </ThemedView>
 
             <ThemedView type="backgroundElement" style={styles.metricCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>STACK P&L</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 18, color: totalStackProfitUsd >= 0 ? '#00E676' : '#FF1744' }}>
-                {totalStackProfitUsd >= 0 ? '+' : ''}${totalStackProfitUsd.toFixed(2)}
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>SPLIT RULE</ThemedText>
+              <ThemedText type="subtitle" style={{ fontSize: 18, color: '#00E676', marginTop: 2 }}>
+                80% / 20%
               </ThemedText>
-              <ThemedText type="smallBold" style={{ color: totalStackProfitPct >= 0 ? '#00E676' : '#FF1744' }}>
-                {totalStackProfitPct >= 0 ? '+' : ''}{totalStackProfitPct.toFixed(2)}% ROI
-              </ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.5, marginTop: 2 }}>80% Profit -&gt; BTC Stack</ThemedText>
             </ThemedView>
           </View>
-
-          {/* Conversion Rules Card */}
-          <ThemedView type="backgroundElement" style={styles.ruleCard}>
-            <ThemedText type="smallBold" style={{ color: '#FF9900' }}>COMPOUNDING ENGINE RULES</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>
-              • 80/20 Split: 80% of net profit converts to BTC; 20% re-allocates to bot capital.
-            </ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>
-              • Dip Execution: Converts on &gt;0.8% intraday dips. Holds USDC during CRASH regime.
-            </ThemedText>
-          </ThemedView>
 
           {/* Conversion History Ledger */}
           <View style={styles.sectionHeader}>
             <ThemedText type="smallBold" style={{ opacity: 0.7 }}>CONVERSION HISTORY LEDGER</ThemedText>
           </View>
 
-          {conversions.map((item) => (
-            <ThemedView key={item.id} type="backgroundElement" style={styles.ledgerCard}>
-              <View style={styles.ledgerRow}>
-                <View>
-                  <ThemedText type="default" style={{ color: '#FF9900', fontWeight: 'bold' }}>
-                    +{item.btc_amount.toFixed(6)} BTC
-                  </ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.6 }}>
-                    From Trade {item.source_trade_id} • {item.purchased_at}
-                  </ThemedText>
-                </View>
-
-                <View style={{ alignItems: 'flex-end' }}>
-                  <ThemedText type="default" style={{ fontWeight: 'bold' }}>
-                    ${item.usd_spent.toFixed(2)} USD
-                  </ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.6 }}>
-                    @ ${item.btc_price_at_buy.toLocaleString()}/BTC
-                  </ThemedText>
-                </View>
-              </View>
+          {conversions.length === 0 ? (
+            <ThemedView type="backgroundElement" style={styles.emptyCard}>
+              <ThemedText type="smallBold" style={{ color: '#FF9900', textAlign: 'center' }}>
+                🪙 80/20 Profit Queue Ready
+              </ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.6, textAlign: 'center', marginTop: 4 }}>
+                When paper trading bots close profitable trades, 80% of net profits automatically convert to BTC and log in this ledger.
+              </ThemedText>
             </ThemedView>
-          ))}
+          ) : (
+            conversions.map((item) => (
+              <ThemedView key={item.id} type="backgroundElement" style={styles.ledgerCard}>
+                <View style={styles.ledgerRow}>
+                  <View>
+                    <ThemedText type="default" style={{ color: '#FF9900', fontWeight: 'bold' }}>
+                      +{item.btc_amount.toFixed(6)} BTC
+                    </ThemedText>
+                    <ThemedText type="small" style={{ opacity: 0.6 }}>
+                      From Trade {item.source_trade_id}
+                    </ThemedText>
+                  </View>
+
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <ThemedText type="default" style={{ fontWeight: 'bold' }}>
+                      ${item.usd_spent.toFixed(2)} USD
+                    </ThemedText>
+                    <ThemedText type="small" style={{ opacity: 0.6 }}>
+                      @ ${item.btc_price_at_buy.toLocaleString()}/BTC
+                    </ThemedText>
+                  </View>
+                </View>
+              </ThemedView>
+            ))
+          )}
 
         </ScrollView>
       </SafeAreaView>
@@ -190,12 +158,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   heroCard: {
-    padding: Spacing.four,
+    padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.two,
+    gap: Spacing.one,
   },
   heroRow: {
     flexDirection: 'row',
@@ -207,23 +175,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   btcVal: {
-    fontSize: 32,
+    fontSize: 28,
   },
   progressBarBg: {
-    height: 10,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#2E3135',
     overflow: 'hidden',
     marginTop: Spacing.one,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 5,
+    borderRadius: 4,
     backgroundColor: '#FF9900',
   },
   milestonesRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginTop: Spacing.two,
     flexWrap: 'wrap',
     gap: Spacing.one,
@@ -243,23 +210,23 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
+    flexShrink: 1,
     padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: 4,
-  },
-  ruleCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: '#161719',
-    borderWidth: 1,
-    borderColor: '#2D3035',
-    gap: Spacing.one,
   },
   sectionHeader: {
     marginTop: Spacing.one,
+  },
+  emptyCard: {
+    padding: Spacing.four,
+    borderRadius: Spacing.three,
+    backgroundColor: '#161719',
+    borderWidth: 1,
+    borderColor: '#2D3035',
+    alignItems: 'center',
   },
   ledgerCard: {
     padding: Spacing.three,

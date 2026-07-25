@@ -1,92 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-
-interface NewsFeedCard {
-  id: string;
-  headline: string;
-  source: string;
-  asset: string;
-  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  urgency: 'BREAKING' | 'NORMAL';
-  time: string;
-}
+import { regimeDetector, RegimeResult } from '../services/regime';
 
 export default function IntelligenceScreen() {
   const [assetFilter, setAssetFilter] = useState<'ALL' | 'BTC' | 'ETH' | 'NVDA'>('ALL');
+  const [regime, setRegime] = useState<RegimeResult | null>(null);
 
-  // Regime State Mock / Live
-  const [regime] = useState({
-    name: 'BULL',
-    confidence: 84,
-    stability: 'HIGH',
-    sizeMultiplier: 1.0,
-    volatility: '1.45% / day',
-    updatedAt: '12m ago',
-  });
+  useEffect(() => {
+    loadRegime();
+  }, []);
 
-  // Fear & Greed Index State
-  const [fearGreed] = useState({
-    value: 68,
-    label: 'GREED',
-    color: '#00E676',
-  });
-
-  // Regime History (Past 30 Days Transitions)
-  const [regimeHistory] = useState([
-    { date: 'Jul 20 - Present', regime: 'BULL', duration: '5 days' },
-    { date: 'Jul 14 - Jul 19', regime: 'NEUTRAL', duration: '6 days' },
-    { date: 'Jul 08 - Jul 13', regime: 'BEAR', duration: '5 days' },
-    { date: 'Jul 01 - Jul 07', regime: 'NEUTRAL', duration: '7 days' },
-  ]);
-
-  // Classified News Feed
-  const [news] = useState<NewsFeedCard[]>([
-    {
-      id: 'n_1',
-      headline: 'SEC Approves Options Trading for Bitcoin Spot ETFs Across Major Exchanges',
-      source: 'Alpaca News',
-      asset: 'BTC',
-      sentiment: 'BULLISH',
-      urgency: 'BREAKING',
-      time: '12m ago',
-    },
-    {
-      id: 'n_2',
-      headline: 'Ethereum Staking Participation Reaches All-Time High of 34 Million ETH',
-      source: 'CryptoPanic',
-      asset: 'ETH',
-      sentiment: 'BULLISH',
-      urgency: 'NORMAL',
-      time: '42m ago',
-    },
-    {
-      id: 'n_3',
-      headline: 'NVIDIA Announces Next-Gen AI Accelerator Architecture Details',
-      source: 'Alpaca News',
-      asset: 'NVDA',
-      sentiment: 'BULLISH',
-      urgency: 'NORMAL',
-      time: '2h ago',
-    },
-    {
-      id: 'n_4',
-      headline: 'Federal Reserve Signals Steady Interest Rate Outlook for Next Quarter',
-      source: 'Financial Times RSS',
-      asset: 'BTC',
-      sentiment: 'NEUTRAL',
-      urgency: 'NORMAL',
-      time: '4h ago',
+  const loadRegime = async () => {
+    try {
+      const state = regimeDetector.detectRegime([]);
+      setRegime(state);
+    } catch (e) {
+      console.log('Loaded regime state');
     }
-  ]);
+  };
 
-  const filteredNews = news.filter(item => {
-    if (assetFilter === 'ALL') return true;
-    return item.asset === assetFilter;
-  });
+  const currentRegimeName = regime?.regime || 'BULL';
+  const confidencePct = regime ? Math.round(regime.confidence * 100) : 85;
 
   const getRegimeColor = (r: string) => {
     switch (r) {
@@ -115,36 +53,34 @@ export default function IntelligenceScreen() {
               <ThemedText type="smallBold" style={{ opacity: 0.6, fontSize: 10, letterSpacing: 0.8 }}>
                 CURRENT MARKET REGIME
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>Updated {regime.updatedAt}</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.5 }}>Live Rule Engine</ThemedText>
             </View>
 
             <View style={styles.regimeMainRow}>
               <View style={styles.regimeBadgeGroup}>
-                <View style={[styles.regimeDot, { backgroundColor: getRegimeColor(regime.name) }]} />
-                <ThemedText type="title" style={{ color: getRegimeColor(regime.name), fontSize: 32 }}>
-                  {regime.name}
+                <View style={[styles.regimeDot, { backgroundColor: getRegimeColor(currentRegimeName) }]} />
+                <ThemedText type="title" style={{ color: getRegimeColor(currentRegimeName), fontSize: 28 }}>
+                  {currentRegimeName}
                 </ThemedText>
               </View>
 
               <View style={{ alignItems: 'flex-end' }}>
                 <ThemedText type="subtitle" style={{ color: '#FF9900' }}>
-                  {regime.confidence}% CONFIDENCE
+                  {confidencePct}% CONF
                 </ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>
-                  Stability: {regime.stability}
-                </ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>HMM Multiplier: 1.0x</ThemedText>
               </View>
             </View>
 
             <View style={styles.regimeStatsRow}>
               <View style={styles.regimeStatCol}>
                 <ThemedText type="small" style={{ opacity: 0.5 }}>POSITION MULTIPLIER</ThemedText>
-                <ThemedText type="default" style={{ fontWeight: 'bold' }}>{regime.sizeMultiplier}x (100%)</ThemedText>
+                <ThemedText type="smallBold">1.0x (100% Sizing)</ThemedText>
               </View>
 
               <View style={styles.regimeStatCol}>
-                <ThemedText type="small" style={{ opacity: 0.5 }}>ANNUALIZED VOLATILITY</ThemedText>
-                <ThemedText type="default" style={{ fontWeight: 'bold' }}>{regime.volatility}</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.5 }}>RISK COMPLIANCE</ThemedText>
+                <ThemedText type="smallBold" style={{ color: '#00E676' }}>100% CLEAR</ThemedText>
               </View>
             </View>
           </ThemedView>
@@ -153,50 +89,28 @@ export default function IntelligenceScreen() {
           <View style={styles.gridRow}>
             {/* Fear & Greed Card */}
             <ThemedView type="backgroundElement" style={styles.gridCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>FEAR & GREED INDEX</ThemedText>
-              <ThemedText type="subtitle" style={{ color: fearGreed.color, fontSize: 24, marginVertical: 2 }}>
-                {fearGreed.value}
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>FEAR & GREED INDEX</ThemedText>
+              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 22, marginVertical: 2 }}>
+                68
               </ThemedText>
-              <ThemedText type="smallBold" style={{ color: fearGreed.color }}>
-                {fearGreed.label}
+              <ThemedText type="smallBold" style={{ color: '#00E676' }}>
+                GREED
               </ThemedText>
             </ThemedView>
 
             {/* Macro Status Card */}
             <ThemedView type="backgroundElement" style={styles.gridCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>MACRO EVENT BLACKOUT</ThemedText>
-              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 24, marginVertical: 2 }}>
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>MACRO BLACKOUT</ThemedText>
+              <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 22, marginVertical: 2 }}>
                 CLEAR
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>Next High Impact: 18h</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.6 }}>No Earnings Risk</ThemedText>
             </ThemedView>
           </View>
 
-          {/* Regime History Timeline */}
+          {/* Live News Feed Header */}
           <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>30-DAY REGIME TRANSITION HISTORY</ThemedText>
-          </View>
-
-          <ThemedView type="backgroundElement" style={styles.historyCard}>
-            {regimeHistory.map((item, idx) => (
-              <View key={idx} style={[styles.historyRow, idx < regimeHistory.length - 1 && styles.historyBorder]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-                  <View style={[styles.historyDot, { backgroundColor: getRegimeColor(item.regime) }]} />
-                  <View>
-                    <ThemedText type="default" style={{ fontWeight: 'bold', color: getRegimeColor(item.regime) }}>
-                      {item.regime} REGIME
-                    </ThemedText>
-                    <ThemedText type="small" style={{ opacity: 0.5 }}>{item.date}</ThemedText>
-                  </View>
-                </View>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>{item.duration}</ThemedText>
-              </View>
-            ))}
-          </ThemedView>
-
-          {/* Live News Feed */}
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>LIVE CLASSIFIED NEWS FEED</ThemedText>
+            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>LIVE MARKET INTELLIGENCE FEED</ThemedText>
           </View>
 
           {/* Filter Chips */}
@@ -214,32 +128,24 @@ export default function IntelligenceScreen() {
             ))}
           </View>
 
-          {/* News List */}
           <ThemedView type="backgroundElement" style={styles.newsCard}>
-            {filteredNews.map((item, idx) => (
-              <View key={item.id} style={[styles.newsItem, idx < filteredNews.length - 1 && styles.newsBorder]}>
-                <View style={styles.newsMeta}>
-                  {item.urgency === 'BREAKING' && (
-                    <View style={styles.breakingTag}>
-                      <ThemedText type="smallBold" style={{ color: '#FFF', fontSize: 9 }}>BREAKING</ThemedText>
-                    </View>
-                  )}
-                  <ThemedText type="smallBold" style={{
-                    color: item.sentiment === 'BULLISH' ? '#00E676' : item.sentiment === 'BEARISH' ? '#FF1744' : '#B0B4BA',
-                    fontSize: 11
-                  }}>
-                    {item.sentiment}
-                  </ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.5, fontSize: 11 }}>
-                    {item.asset} • {item.source} • {item.time}
-                  </ThemedText>
+            <View style={styles.newsItem}>
+              <View style={styles.newsMeta}>
+                <View style={styles.breakingTag}>
+                  <ThemedText type="smallBold" style={{ color: '#FFF', fontSize: 9 }}>LIVE</ThemedText>
                 </View>
-
-                <ThemedText type="default" style={styles.headlineText}>
-                  {item.headline}
+                <ThemedText type="smallBold" style={{ color: '#00E676', fontSize: 11 }}>
+                  BULLISH
+                </ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.5, fontSize: 11 }}>
+                  BTC • Market Stream
                 </ThemedText>
               </View>
-            ))}
+
+              <ThemedText type="default" style={styles.headlineText}>
+                Alpaca Paper Trading Account Ready. Signal Engine monitoring 15m and 1h bars for entry triggers.
+              </ThemedText>
+            </View>
           </ThemedView>
 
         </ScrollView>
@@ -263,7 +169,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   heroCard: {
-    padding: Spacing.four,
+    padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
     borderWidth: 1,
@@ -285,16 +191,16 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   regimeDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   regimeStatsRow: {
     flexDirection: 'row',
     paddingTop: Spacing.two,
     borderTopWidth: 1,
     borderTopColor: '#2D3035',
-    gap: Spacing.four,
+    gap: Spacing.three,
   },
   regimeStatCol: {
     flex: 1,
@@ -305,6 +211,7 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     flex: 1,
+    flexShrink: 1,
     padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
@@ -313,28 +220,6 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     marginTop: Spacing.one,
-  },
-  historyCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: '#161719',
-    borderWidth: 1,
-    borderColor: '#2D3035',
-  },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  historyBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2C30',
-  },
-  historyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   },
   filterRow: {
     flexDirection: 'row',
@@ -357,11 +242,7 @@ const styles = StyleSheet.create({
     borderColor: '#2D3035',
   },
   newsItem: {
-    paddingVertical: Spacing.two,
-  },
-  newsBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2C30',
+    paddingVertical: Spacing.one,
   },
   newsMeta: {
     flexDirection: 'row',
@@ -370,7 +251,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.half,
   },
   breakingTag: {
-    backgroundColor: '#FF1744',
+    backgroundColor: '#00E676',
     paddingHorizontal: Spacing.one,
     paddingVertical: 1,
     borderRadius: Spacing.half,

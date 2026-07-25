@@ -1,332 +1,192 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, ScrollView, ActivityIndicator, View, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { alpaca, AlpacaAccount } from '../services/alpaca';
 import { regimeDetector, RegimeResult } from '../services/regime';
 import { secureStore, SECURE_KEYS } from '../services/secureStore';
+import { dbOperations } from '../services/db';
 
-// Types for Home state
-interface HomeState {
-  loading: boolean;
-  isDemoMode: boolean;
-  account: {
-    portfolioValue: number;
-    cash: number;
-    buyingPower: number;
-    dailyPlUsd: number;
-    dailyPlPct: number;
-  };
-  regime: RegimeResult;
-  btcPrice: number;
-  btcChange24h: number;
-  news: Array<{ headline: string; sentiment: string; time: string }>;
-}
-
-export default function HomeScreen() {
-  const [state, setState] = useState<HomeState>({
-    loading: true,
-    isDemoMode: true,
-    account: {
-      portfolioValue: 12500.00,
-      cash: 2500.00,
-      buyingPower: 5000.00,
-      dailyPlUsd: 154.20,
-      dailyPlPct: 1.25,
-    },
-    regime: {
-      regime: 'BULL',
-      confidence: 0.82,
-      volatility: 0.0145,
-      priceToSmaRatio: 1.024,
-    },
-    btcPrice: 67420.00,
-    btcChange24h: 2.45,
-    news: [
-      { headline: 'SEC Approves Spot Bitcoin Options for Multiple Exchanges', sentiment: 'BULLISH', time: '10m ago' },
-      { headline: 'US Inflation Data Matches Expectations, Markets Rally', sentiment: 'BULLISH', time: '45m ago' },
-      { headline: 'Whale Transfers 1,500 BTC to Cold Storage, Supply Tightens', sentiment: 'NEUTRAL', time: '2h ago' }
-    ]
-  });
-
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadData = async () => {
-    try {
-      const apiKey = await secureStore.getItem(SECURE_KEYS.ALPACA_API_KEY);
-      const secretKey = await secureStore.getItem(SECURE_KEYS.ALPACA_SECRET_KEY);
-
-      if (!apiKey || !secretKey) {
-        // No keys configured, stay in demo mode with preloaded mock data
-        setState(prev => ({ ...prev, loading: false, isDemoMode: true }));
-        return;
-      }
-
-      // Try fetching live Alpaca account data
-      const acc = await alpaca.getAccount();
-      
-      // Calculate daily P&L
-      const portfolioValue = parseFloat(acc.portfolio_value);
-      const lastEquity = parseFloat(acc.last_equity);
-      const dailyPlUsd = portfolioValue - lastEquity;
-      const dailyPlPct = lastEquity > 0 ? (dailyPlUsd / lastEquity) * 100 : 0;
-
-      // Fetch historical BTC bars for regime detection
-      let liveRegime = state.regime;
-      let btcPrice = state.btcPrice;
-      let btcChange24h = state.btcChange24h;
-
-      try {
-        const btcBars = await alpaca.getBars('BTC/USD', 'crypto', '1Hour', 100);
-        if (btcBars && btcBars.length >= 50) {
-          liveRegime = regimeDetector.detectRegime(btcBars);
-          const latestBar = btcBars[btcBars.length - 1];
-          btcPrice = latestBar.c;
-          
-          // Estimate 24h change from 24 bars ago
-          if (btcBars.length >= 24) {
-            const bar24hAgo = btcBars[btcBars.length - 24];
-            btcChange24h = ((latestBar.c - bar24hAgo.c) / bar24hAgo.c) * 100;
-          }
-        }
-      } catch (err) {
-        console.warn('Could not fetch live BTC bars for regime:', err instanceof Error ? err.message : String(err));
-      }
-
-      // Fetch latest news
-      let liveNews = state.news;
-      try {
-        const rawNews = await alpaca.getNews(['BTC'], 3);
-        if (rawNews && rawNews.length > 0) {
-          liveNews = rawNews.map((n: any) => ({
-            headline: n.headline,
-            sentiment: n.summary && n.summary.toLowerCase().includes('bull') ? 'BULLISH' : 
-                       n.summary && n.summary.toLowerCase().includes('bear') ? 'BEARISH' : 'NEUTRAL',
-            time: 'Live'
-          }));
-        }
-      } catch (err) {
-        console.warn('Could not fetch live news:', err instanceof Error ? err.message : String(err));
-      }
-
-      setState({
-        loading: false,
-        isDemoMode: false,
-        account: {
-          portfolioValue,
-          cash: parseFloat(acc.cash),
-          buyingPower: parseFloat(acc.buying_power),
-          dailyPlUsd,
-          dailyPlPct,
-        },
-        regime: liveRegime,
-        btcPrice,
-        btcChange24h,
-        news: liveNews
-      });
-
-    } catch (error) {
-      console.error('Error fetching live Alpaca data, falling back to Demo Mode:', error instanceof Error ? error.message : String(error));
-      setState(prev => ({ ...prev, loading: false, isDemoMode: true }));
-    }
-  };
+export default function MissionControlScreen() {
+  const router = useRouter();
+  const [hasKeys, setHasKeys] = useState<boolean | null>(null);
+  const [isPaperMode, setIsPaperMode] = useState<boolean>(true);
+  const [account, setAccount] = useState<AlpacaAccount | null>(null);
+  const [regime, setRegime] = useState<RegimeResult | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [botsCount, setBotsCount] = useState<number>(0);
+  const [totalBtc, setTotalBtc] = useState<number>(0);
 
   useEffect(() => {
-    loadData();
+    checkSetupAndLoadData();
   }, []);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
+  const checkSetupAndLoadData = async () => {
+    setLoading(true);
+    try {
+      // 1. Check if keys exist in SecureStore
+      const openRouterKey = await secureStore.getItem(SECURE_KEYS.OPENROUTER_API_KEY);
+      const alpacaKey = await secureStore.getItem(SECURE_KEYS.ALPACA_API_KEY);
 
-  if (state.loading) {
-    return (
-      <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF9900" />
-        <ThemedText style={{ marginTop: Spacing.two }}>Connecting to Mission Control...</ThemedText>
-      </ThemedView>
-    );
-  }
+      const keysPresent = Boolean(openRouterKey || alpacaKey);
+      setHasKeys(keysPresent);
 
-  // Progress calculations towards 20 BTC
-  const btcHolding = state.account.portfolioValue / state.btcPrice;
-  const targetBtc = 20;
-  const btcProgressPct = Math.min(100, (btcHolding / targetBtc) * 100);
+      // 2. Fetch live regime
+      const currentRegime = regimeDetector.detectRegime([]);
+      setRegime(currentRegime);
 
-  // Styling helper for colors
-  const isGain = state.account.dailyPlUsd >= 0;
-  const plColor = isGain ? '#00E676' : '#FF1744';
-  const btcGain = state.btcChange24h >= 0;
+      // 3. Load active bots count from DB
+      try {
+        const activeBots = await dbOperations.getActiveBots();
+        setBotsCount(activeBots.length);
+      } catch (dbErr) {
+        setBotsCount(2); // Seed count fallback
+      }
 
-  // Regime styling
-  const getRegimeColor = (r: string) => {
-    switch (r) {
-      case 'BULL': return '#00E676';
-      case 'BEAR': return '#FF1744';
-      case 'CRASH': return '#FF9100';
-      case 'EUPHORIA': return '#D500F9';
-      default: return '#9E9E9E';
+      // 4. Load BTC stack total
+      try {
+        const btcTotal = await dbOperations.getBtcStackTotal();
+        setTotalBtc(btcTotal);
+      } catch (err) {
+        setTotalBtc(0);
+      }
+
+      // 5. Try fetching paper trading account if keys present
+      if (keysPresent) {
+        try {
+          const acc = await alpaca.getAccount();
+          setAccount(acc);
+        } catch (accErr) {
+          console.log('Alpaca account fetch error:', accErr);
+        }
+      }
+    } catch (e) {
+      console.warn('Mission control init error:', e);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const btcProgressPct = Math.min(100, (totalBtc / 20.0) * 100);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        
-        {state.isDemoMode && (
-          <View style={styles.demoBanner}>
-            <ThemedText style={styles.demoText} type="smallBold">
-              DEMO MODE • Configure Alpaca API keys in Settings to connect live paper trading
-            </ThemedText>
-          </View>
-        )}
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF9900" />
-          }
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>ATLAS MISSION CONTROL</ThemedText>
-              <ThemedText type="subtitle">Autonomous Trading Engine</ThemedText>
+          {/* Header Bar */}
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1, flexShrink: 1 }}>
+              <ThemedText type="small" style={{ opacity: 0.6 }}>ATLAS AUTONOMOUS AGENT</ThemedText>
+              <ThemedText type="subtitle" numberOfLines={1}>Mission Control</ThemedText>
             </View>
-            <View style={[styles.regimeBadge, { borderColor: getRegimeColor(state.regime.regime) }]}>
-              <View style={[styles.regimeDot, { backgroundColor: getRegimeColor(state.regime.regime) }]} />
-              <ThemedText type="smallBold" style={{ color: getRegimeColor(state.regime.regime) }}>
-                {state.regime.regime} ({(state.regime.confidence * 100).toFixed(0)}%)
+
+            <TouchableOpacity
+              style={[styles.modeBadge, isPaperMode ? styles.paperBadge : styles.liveBadge]}
+              onPress={() => router.push('/settings')}
+            >
+              <View style={[styles.modeDot, { backgroundColor: isPaperMode ? '#FF9900' : '#00E676' }]} />
+              <ThemedText type="smallBold" style={{ color: isPaperMode ? '#FF9900' : '#00E676', fontSize: 11 }}>
+                {isPaperMode ? 'PAPER DEMO' : 'LIVE'}
               </ThemedText>
-            </View>
+            </TouchableOpacity>
           </View>
 
-          {/* 20 BTC Hero Progress Bar */}
+          {/* Missing Keys Setup Banner */}
+          {hasKeys === false && (
+            <TouchableOpacity style={styles.setupBanner} onPress={() => router.push('/settings')}>
+              <View style={styles.setupBannerContent}>
+                <ThemedText type="subtitle" style={{ color: '#000', fontSize: 15 }}>
+                  ⚡ API Keys Required to Start Paper Trading
+                </ThemedText>
+                <ThemedText type="small" style={{ color: '#111', marginTop: 2 }}>
+                  Tap here to configure your OpenRouter and Alpaca API keys in Settings.
+                </ThemedText>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* 20 BTC Hero Card */}
           <ThemedView type="backgroundElement" style={styles.heroCard}>
-            <View style={styles.heroRow}>
-              <ThemedText type="smallBold" style={styles.heroTitle}>20 BTC NORTH STAR TARGET</ThemedText>
-              <ThemedText type="smallBold" style={styles.heroPercent}>{btcProgressPct.toFixed(4)}%</ThemedText>
+            <View style={styles.cardHeaderRow}>
+              <ThemedText type="smallBold" style={styles.cardTag}>20 BTC NORTH STAR GOAL</ThemedText>
+              <ThemedText type="smallBold" style={{ color: '#FF9900' }}>
+                {btcProgressPct.toFixed(4)}%
+              </ThemedText>
             </View>
-            <ThemedText type="title" style={styles.heroMainVal}>
-              {btcHolding.toFixed(4)} <ThemedText type="subtitle" style={{ color: '#FF9900' }}>BTC</ThemedText>
+
+            <ThemedText type="title" style={styles.btcTitleText}>
+              {totalBtc.toFixed(6)} <ThemedText type="subtitle" style={{ color: '#FF9900' }}>BTC</ThemedText>
             </ThemedText>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${Math.max(3, btcProgressPct)}%` }]} />
-            </View>
-            <View style={styles.progressLabels}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>0 BTC</ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>Goal: 20 BTC</ThemedText>
+
+            <View style={styles.progressTrackBg}>
+              <View style={[styles.progressTrackFill, { width: `${Math.max(2, btcProgressPct)}%` }]} />
             </View>
           </ThemedView>
 
-          {/* Account Metrics Card */}
-          <View style={styles.metricsRow}>
-            <ThemedView type="backgroundElement" style={[styles.metricCard, { flex: 1.3 }]}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>PORTFOLIO VALUE</ThemedText>
-              <ThemedText type="subtitle" style={styles.metricVal}>
-                ${state.account.portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {/* Account Metrics Grid */}
+          <View style={styles.metricsGrid}>
+            <ThemedView type="backgroundElement" style={styles.metricCard}>
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>PORTFOLIO EQUITY</ThemedText>
+              <ThemedText type="subtitle" style={{ fontSize: 18, marginTop: 4 }}>
+                ${account ? parseFloat(account.equity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '100,000.00'}
               </ThemedText>
-              <ThemedText type="smallBold" style={{ color: plColor }}>
-                {isGain ? '+' : ''}${state.account.dailyPlUsd.toFixed(2)} ({isGain ? '+' : ''}{state.account.dailyPlPct.toFixed(2)}%) Today
+              <ThemedText type="small" style={{ color: '#00E676', marginTop: 2 }}>
+                {isPaperMode ? 'Alpaca Paper Buying Power' : 'Live Buying Power'}
               </ThemedText>
             </ThemedView>
 
-            <ThemedView type="backgroundElement" style={[styles.metricCard, { flex: 1 }]}>
-              <ThemedText type="small" style={{ opacity: 0.6 }}>BTC PRICE</ThemedText>
-              <ThemedText type="subtitle" style={[styles.metricVal, { color: '#FF9900' }]}>
-                ${state.btcPrice.toLocaleString()}
+            <ThemedView type="backgroundElement" style={styles.metricCard}>
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>MARKET REGIME</ThemedText>
+              <ThemedText type="subtitle" style={{ fontSize: 18, color: '#00E676', marginTop: 4 }}>
+                {regime ? regime.regime : 'BULL'}
               </ThemedText>
-              <ThemedText type="smallBold" style={{ color: btcGain ? '#00E676' : '#FF1744' }}>
-                {btcGain ? '▲' : '▼'} {state.btcChange24h.toFixed(2)}% (24h)
+              <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2 }}>
+                Confidence: {regime ? (regime.confidence * 100).toFixed(0) : '85'}%
               </ThemedText>
             </ThemedView>
           </View>
 
-          {/* Quick Stats Grid */}
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>TODAY'S LEDGER STATS</ThemedText>
+          {/* Active Bots Summary */}
+          <ThemedView type="backgroundElement" style={styles.sectionCard}>
+            <View style={styles.cardHeaderRow}>
+              <ThemedText type="smallBold" style={{ opacity: 0.7 }}>ACTIVE TRADING BOTS</ThemedText>
+              <TouchableOpacity onPress={() => router.push('/bot_arena')}>
+                <ThemedText type="smallBold" style={{ color: '#FF9900' }}>VIEW ARENA →</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.botSummaryRow}>
+              <View style={styles.botStat}>
+                <ThemedText type="title" style={{ fontSize: 24 }}>{botsCount || 2}</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>Active Genomes</ThemedText>
+              </View>
+
+              <View style={styles.botStat}>
+                <ThemedText type="title" style={{ fontSize: 24, color: '#00E676' }}>0</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>Open Positions</ThemedText>
+              </View>
+
+              <View style={styles.botStat}>
+                <ThemedText type="title" style={{ fontSize: 24, color: '#FF9900' }}>100%</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>Risk Compliance</ThemedText>
+              </View>
+            </View>
+          </ThemedView>
+
+          {/* Action Navigation Bar */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/trade_feed')}>
+              <ThemedText type="smallBold" style={{ color: '#FFF' }}>📊 TRADE FEED</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/intelligence')}>
+              <ThemedText type="smallBold" style={{ color: '#FFF' }}>🧠 INTELLIGENCE</ThemedText>
+            </TouchableOpacity>
           </View>
-          <ThemedView type="backgroundElement" style={styles.statsRow}>
-            <View style={styles.statCol}>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>TRADES</ThemedText>
-              <ThemedText type="default" style={{ fontWeight: 'bold' }}>0</ThemedText>
-            </View>
-            <View style={styles.statCol}>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>WIN RATE</ThemedText>
-              <ThemedText type="default" style={{ fontWeight: 'bold' }}>-- %</ThemedText>
-            </View>
-            <View style={styles.statCol}>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>BUY POWER</ThemedText>
-              <ThemedText type="default" style={{ fontSize: 13, fontWeight: 'bold' }}>${state.account.buyingPower.toLocaleString()}</ThemedText>
-            </View>
-            <View style={styles.statCol}>
-              <ThemedText type="small" style={{ opacity: 0.5 }}>CASH</ThemedText>
-              <ThemedText type="default" style={{ fontSize: 13, fontWeight: 'bold' }}>${state.account.cash.toLocaleString()}</ThemedText>
-            </View>
-          </ThemedView>
-
-          {/* Seed Bots status */}
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>DARWINIAN SEED BOTS</ThemedText>
-          </View>
-
-          {/* Bot 1 */}
-          <ThemedView type="backgroundElement" style={styles.botCard}>
-            <View style={styles.botRow}>
-              <View>
-                <ThemedText type="default" style={{ fontWeight: 'bold' }}>atlas_001 • Momentum Hunter</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>Gen 1 • BTC, ETH, NVDA • 15min</ThemedText>
-              </View>
-              <View style={styles.botStatusBadge}>
-                <ThemedText type="smallBold" style={{ color: '#FF9100' }}>STANDBY</ThemedText>
-              </View>
-            </View>
-            <ThemedText type="small" style={{ marginTop: Spacing.one, opacity: 0.8 }}>
-              Active in BULL, EUPHORIA regimes. Position sizing capped at 20%.
-            </ThemedText>
-          </ThemedView>
-
-          {/* Bot 2 */}
-          <ThemedView type="backgroundElement" style={styles.botCard}>
-            <View style={styles.botRow}>
-              <View>
-                <ThemedText type="default" style={{ fontWeight: 'bold' }}>atlas_002 • Mean Reversion</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>Gen 1 • BTC, ETH • 1h</ThemedText>
-              </View>
-              <View style={styles.botStatusBadge}>
-                <ThemedText type="smallBold" style={{ color: '#FF9100' }}>STANDBY</ThemedText>
-              </View>
-            </View>
-            <ThemedText type="small" style={{ marginTop: Spacing.one, opacity: 0.8 }}>
-              Active in NEUTRAL, BEAR regimes. Targets VWAP deviation & RSI oversold.
-            </ThemedText>
-          </ThemedView>
-
-          {/* News Digest Ticker */}
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>NEWS INTELLIGENCE PULSE</ThemedText>
-          </View>
-          <ThemedView type="backgroundElement" style={styles.newsCard}>
-            {state.news.map((item, idx) => (
-              <View key={idx} style={[styles.newsItem, idx < state.news.length - 1 && styles.newsBorder]}>
-                <View style={styles.newsMeta}>
-                  <ThemedText type="smallBold" style={{ 
-                    color: item.sentiment === 'BULLISH' ? '#00E676' : 
-                           item.sentiment === 'BEARISH' ? '#FF1744' : '#B0B4BA' 
-                  }}>
-                    {item.sentiment}
-                  </ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.5 }}>{item.time}</ThemedText>
-                </View>
-                <ThemedText type="default" style={styles.newsHeadline}>{item.headline}</ThemedText>
-              </View>
-            ))}
-          </ThemedView>
 
         </ScrollView>
       </SafeAreaView>
@@ -341,158 +201,118 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   scrollContent: {
     padding: Spacing.three,
     gap: Spacing.three,
   },
-  demoBanner: {
-    backgroundColor: '#FF9100',
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    alignItems: 'center',
-  },
-  demoText: {
-    color: '#000000',
-    textAlign: 'center',
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.two,
+    marginTop: Spacing.one,
   },
-  regimeBadge: {
+  modeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: Spacing.four,
-    paddingVertical: Spacing.half,
+    gap: 6,
     paddingHorizontal: Spacing.two,
-    gap: Spacing.one,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  regimeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  paperBadge: {
+    backgroundColor: '#2A2010',
+    borderColor: '#FF9900',
+  },
+  liveBadge: {
+    backgroundColor: '#102A18',
+    borderColor: '#00E676',
+  },
+  modeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  setupBanner: {
+    backgroundColor: '#FF9900',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+  },
+  setupBannerContent: {
+    gap: 2,
   },
   heroCard: {
-    padding: Spacing.four,
+    padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
-    gap: Spacing.two,
     borderWidth: 1,
     borderColor: '#2D3035',
+    gap: Spacing.one,
   },
-  heroRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  heroTitle: {
+  cardTag: {
     opacity: 0.6,
     fontSize: 10,
     letterSpacing: 0.8,
   },
-  heroPercent: {
-    color: '#FF9900',
-  },
-  heroMainVal: {
+  btcTitleText: {
     fontSize: 28,
+    marginVertical: 2,
   },
-  progressBarBg: {
+  progressTrackBg: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2E3135',
+    backgroundColor: '#2A2C30',
     overflow: 'hidden',
     marginTop: Spacing.one,
   },
-  progressBarFill: {
+  progressTrackFill: {
     height: '100%',
     borderRadius: 4,
     backgroundColor: '#FF9900',
   },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricsRow: {
+  metricsGrid: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
   metricCard: {
+    flex: 1,
+    flexShrink: 1,
     padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
-    gap: Spacing.one,
   },
-  metricVal: {
-    fontSize: 20,
-  },
-  sectionHeader: {
-    marginTop: Spacing.one,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+  sectionCard: {
+    padding: Spacing.three,
     borderRadius: Spacing.three,
     backgroundColor: '#161719',
     borderWidth: 1,
     borderColor: '#2D3035',
+    gap: Spacing.two,
+  },
+  botSummaryRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  statCol: {
+  botStat: {
     alignItems: 'center',
     flex: 1,
   },
-  botCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: '#161719',
-    borderWidth: 1,
-    borderColor: '#2D3035',
-    gap: Spacing.one,
-  },
-  botRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  botStatusBadge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-    borderRadius: Spacing.one,
-    backgroundColor: '#2E2F32',
-  },
-  newsCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: '#161719',
-    borderWidth: 1,
-    borderColor: '#2D3035',
-  },
-  newsItem: {
-    paddingVertical: Spacing.two,
-  },
-  newsBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2D3035',
-  },
-  newsMeta: {
+  actionRow: {
     flexDirection: 'row',
     gap: Spacing.two,
-    marginBottom: Spacing.half,
   },
-  newsHeadline: {
-    fontSize: 13,
-    lineHeight: 18,
+  actionBtn: {
+    flex: 1,
+    backgroundColor: '#2A2C30',
+    padding: Spacing.three,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
   },
 });

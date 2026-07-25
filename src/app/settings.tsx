@@ -1,58 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, View, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { secureStore } from '../services/secureStore';
+import { secureStore, SECURE_KEYS } from '../services/secureStore';
 import { alpaca } from '../services/alpaca';
 
 export default function SettingsScreen() {
   const [tradingMode, setTradingMode] = useState<'PAPER' | 'LIVE'>('PAPER');
   const [isEmergencyHalted, setIsEmergencyHalted] = useState<boolean>(false);
 
-  // Form State
-  const [openRouterKey, setOpenRouterKey] = useState('sk-or-v1-****************');
-  const [alpacaApiKey, setAlpacaApiKey] = useState('PK****************');
-  const [alpacaSecretKey, setAlpacaSecretKey] = useState('********************************');
-  const [pineconeKey, setPineconeKey] = useState('pcsk_****************');
-  const [pineconeHost, setPineconeHost] = useState('https://atlas-index-1234.pinecone.io');
+  // Key Inputs
+  const [openRouterKey, setOpenRouterKey] = useState('');
+  const [alpacaApiKey, setAlpacaApiKey] = useState('');
+  const [alpacaSecretKey, setAlpacaSecretKey] = useState('');
+  const [pineconeKey, setPineconeKey] = useState('');
+  const [pineconeHost, setPineconeHost] = useState('');
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
 
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  // Save Credentials to Hardware-Backed SecureStore
+  useEffect(() => {
+    loadExistingKeys();
+  }, []);
+
+  const loadExistingKeys = async () => {
+    try {
+      const orKey = await secureStore.getItem(SECURE_KEYS.OPENROUTER_API_KEY);
+      if (orKey) setOpenRouterKey(orKey);
+
+      const alpKey = await secureStore.getItem(SECURE_KEYS.ALPACA_API_KEY);
+      if (alpKey) setAlpacaApiKey(alpKey);
+
+      const alpSec = await secureStore.getItem(SECURE_KEYS.ALPACA_SECRET_KEY);
+      if (alpSec) setAlpacaSecretKey(alpSec);
+
+      const pinKey = await secureStore.getItem(SECURE_KEYS.PINECONE_API_KEY);
+      if (pinKey) setPineconeKey(pinKey);
+    } catch (e) {
+      console.log('Key load error:', e);
+    }
+  };
+
   const handleSaveCredentials = async () => {
     try {
-      if (openRouterKey && !openRouterKey.includes('*')) {
-        await secureStore.setItem('OPENROUTER_API_KEY', openRouterKey);
-      }
-      if (alpacaApiKey && !alpacaApiKey.includes('*')) {
-        await secureStore.setItem('ALPACA_API_KEY', alpacaApiKey);
-      }
-      if (alpacaSecretKey && !alpacaSecretKey.includes('*')) {
-        await secureStore.setItem('ALPACA_SECRET_KEY', alpacaSecretKey);
-      }
-      if (pineconeKey && !pineconeKey.includes('*')) {
-        await secureStore.setItem('PINECONE_API_KEY', pineconeKey);
-      }
+      if (openRouterKey) await secureStore.setItem(SECURE_KEYS.OPENROUTER_API_KEY, openRouterKey);
+      if (alpacaApiKey) await secureStore.setItem(SECURE_KEYS.ALPACA_API_KEY, alpacaApiKey);
+      if (alpacaSecretKey) await secureStore.setItem(SECURE_KEYS.ALPACA_SECRET_KEY, alpacaSecretKey);
+      if (pineconeKey) await secureStore.setItem(SECURE_KEYS.PINECONE_API_KEY, pineconeKey);
 
-      setSaveStatus('✅ API Credentials Encrypted & Saved!');
-      setTimeout(() => setSaveStatus(null), 3000);
+      setSaveStatus('✅ API Credentials Encrypted & Saved to SecureStore!');
+      setTimeout(() => setSaveStatus(null), 4000);
     } catch (err) {
       setSaveStatus('❌ Error saving credentials to SecureStore');
     }
   };
 
-  // Toggle Live vs Paper Mode
   const handleToggleTradingMode = (newMode: 'PAPER' | 'LIVE') => {
     if (newMode === 'LIVE') {
       Alert.alert(
         '⚠️ CONFIRM LIVE TRADING MODE',
-        'You are switching to LIVE REAL-MONEY TRADING. ATLAS will execute real market orders via Alpaca. Are you sure?',
+        'You are switching to LIVE REAL-MONEY TRADING. ATLAS will execute real market orders via Alpaca. Are you sure you are ready?',
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Keep Paper Trading', style: 'cancel' },
           {
-            text: 'Enable Live Trading',
+            text: 'Enable Live Real-Money Trading',
             style: 'destructive',
             onPress: () => {
               alpaca.setMode(true);
@@ -67,11 +81,10 @@ export default function SettingsScreen() {
     }
   };
 
-  // Emergency Stop Circuit Breaker
   const handleEmergencyStop = () => {
     Alert.alert(
       '🚨 EMERGENCY STOP ALL BOTS',
-      'This will IMMEDIATELY halt all bot signals, cancel pending orders, and pause trading across all markets.',
+      'This will IMMEDIATELY halt all bot signals, cancel pending paper/live orders, and pause trading across all markets.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -115,7 +128,7 @@ export default function SettingsScreen() {
             </ThemedView>
           ) : (
             <TouchableOpacity style={styles.emergencyBtn} onPress={handleEmergencyStop}>
-              <ThemedText type="subtitle" style={{ color: '#FFF', fontSize: 16 }}>
+              <ThemedText type="subtitle" style={{ color: '#FFF', fontSize: 15 }}>
                 🚨 EMERGENCY STOP ALL TRADING
               </ThemedText>
             </TouchableOpacity>
@@ -124,13 +137,16 @@ export default function SettingsScreen() {
           {/* Trading Mode Segmented Toggle */}
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold" style={{ opacity: 0.7 }}>TRADING MODE SELECTION</ThemedText>
+            <ThemedText type="small" style={{ opacity: 0.6 }}>
+              Default mode is Paper Trading. Test bot strategies risk-free with virtual paper capital first before switching to real-money execution.
+            </ThemedText>
             
             <View style={styles.modeRow}>
               <TouchableOpacity
                 style={[styles.modeTab, tradingMode === 'PAPER' && styles.modeTabActivePaper]}
                 onPress={() => handleToggleTradingMode('PAPER')}
               >
-                <ThemedText type="smallBold" style={{ color: tradingMode === 'PAPER' ? '#000' : '#8E8E93' }}>
+                <ThemedText type="smallBold" style={{ color: tradingMode === 'PAPER' ? '#000' : '#8E8E93', fontSize: 11 }}>
                   PAPER DEMO (SAFE)
                 </ThemedText>
               </TouchableOpacity>
@@ -139,7 +155,7 @@ export default function SettingsScreen() {
                 style={[styles.modeTab, tradingMode === 'LIVE' && styles.modeTabActiveLive]}
                 onPress={() => handleToggleTradingMode('LIVE')}
               >
-                <ThemedText type="smallBold" style={{ color: tradingMode === 'LIVE' ? '#FFF' : '#8E8E93' }}>
+                <ThemedText type="smallBold" style={{ color: tradingMode === 'LIVE' ? '#FFF' : '#8E8E93', fontSize: 11 }}>
                   LIVE REAL-MONEY ⚠️
                 </ThemedText>
               </TouchableOpacity>
@@ -150,7 +166,7 @@ export default function SettingsScreen() {
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="smallBold" style={{ color: '#FF9900' }}>ENCRYPTED API CREDENTIALS</ThemedText>
             <ThemedText type="small" style={{ opacity: 0.6 }}>
-              Keys are hardware-encrypted on-device using Android Keystore / iOS Keychain.
+              Credentials are encrypted on-device using hardware-backed SecureStore (Android Keystore).
             </ThemedText>
 
             {/* OpenRouter Key */}
@@ -161,18 +177,20 @@ export default function SettingsScreen() {
                 value={openRouterKey}
                 onChangeText={setOpenRouterKey}
                 secureTextEntry
+                placeholder="sk-or-v1-..."
                 placeholderTextColor="#666"
               />
             </View>
 
             {/* Alpaca Keys */}
             <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Alpaca API Key</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.8 }}>Alpaca API Key (Paper & Live)</ThemedText>
               <TextInput
                 style={styles.textInput}
                 value={alpacaApiKey}
                 onChangeText={setAlpacaApiKey}
                 secureTextEntry
+                placeholder="PK..."
                 placeholderTextColor="#666"
               />
             </View>
@@ -184,18 +202,20 @@ export default function SettingsScreen() {
                 value={alpacaSecretKey}
                 onChangeText={setAlpacaSecretKey}
                 secureTextEntry
+                placeholder="Secret key..."
                 placeholderTextColor="#666"
               />
             </View>
 
             {/* Pinecone Keys */}
             <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Pinecone API Key (Vector Memory RAG)</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.8 }}>Pinecone API Key (Vector RAG Memory)</ThemedText>
               <TextInput
                 style={styles.textInput}
                 value={pineconeKey}
                 onChangeText={setPineconeKey}
                 secureTextEntry
+                placeholder="pcsk_..."
                 placeholderTextColor="#666"
               />
             </View>
@@ -206,6 +226,7 @@ export default function SettingsScreen() {
                 style={styles.textInput}
                 value={pineconeHost}
                 onChangeText={setPineconeHost}
+                placeholder="https://atlas-index-1234.pinecone.io"
                 placeholderTextColor="#666"
               />
             </View>
@@ -215,7 +236,9 @@ export default function SettingsScreen() {
               <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Project URL</ThemedText>
               <TextInput
                 style={styles.textInput}
-                value="https://your-supabase-project.supabase.co"
+                value={supabaseUrl}
+                onChangeText={setSupabaseUrl}
+                placeholder="https://your-project.supabase.co"
                 placeholderTextColor="#666"
               />
             </View>
@@ -224,8 +247,10 @@ export default function SettingsScreen() {
               <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Anon Key</ThemedText>
               <TextInput
                 style={styles.textInput}
-                value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={supabaseAnonKey}
+                onChangeText={setSupabaseAnonKey}
                 secureTextEntry
+                placeholder="eyJhbG..."
                 placeholderTextColor="#666"
               />
             </View>
@@ -241,18 +266,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </ThemedView>
 
-          {/* Hard Risk Rules Summary */}
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="smallBold" style={{ color: '#FF9900' }}>ACTIVE CODE-LEVEL HARD RISK RULES</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>1. Mandatory Stop Loss on all orders</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>2. Max 20% position size per trade hard cap</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>3. 1% Portfolio risk rule (stop-loss distance sizing)</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>4. 5% Daily loss limit trading halt</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>5. 20% Total drawdown circuit breaker</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.8 }}>6. CRASH regime zero-entry lock</ThemedText>
-          </ThemedView>
-
-          {/* System Version Footer */}
+          {/* System Info */}
           <View style={styles.footer}>
             <ThemedText type="small" style={{ opacity: 0.4, textAlign: 'center' }}>
               ATLAS Autonomous Trading Engine v1.0.0 • Expo SDK 57 (Android)
