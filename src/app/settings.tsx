@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, View, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { StyleSheet, View, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { Screen } from '../components/layout/Screen';
+import { Card } from '../components/layout/Card';
+import { Row } from '../components/layout/Row';
+import { Stack } from '../components/layout/Stack';
+import { Text } from '../components/typography/Text';
+import { CostPreviewBanner } from '../components/settings/CostPreviewBanner';
+import { ModelTaskList } from '../components/settings/ModelTaskList';
+import { ModelPickerSheet } from '../components/settings/ModelPickerSheet';
+import { ConversionRatioSlider } from '../components/settings/ConversionRatioSlider';
+import { BtcGoalEditor } from '../components/settings/BtcGoalEditor';
+import { RiskLimitsEditor } from '../components/settings/RiskLimitsEditor';
+import { LLMTaskKey } from '../types/settings';
+import { useSettingsStore } from '../store/settingsStore';
 import { secureStore, SECURE_KEYS } from '../services/secureStore';
 import { alpaca } from '../services/alpaca';
 
 export default function SettingsScreen() {
+  const { updateModelForTask, resetAllSettings } = useSettingsStore();
+
   const [tradingMode, setTradingMode] = useState<'PAPER' | 'LIVE'>('PAPER');
   const [isEmergencyHalted, setIsEmergencyHalted] = useState<boolean>(false);
+  const [activeTaskForPicker, setActiveTaskForPicker] = useState<LLMTaskKey | null>(null);
 
   // Key Inputs
   const [openRouterKey, setOpenRouterKey] = useState('');
@@ -51,7 +63,7 @@ export default function SettingsScreen() {
       if (alpacaSecretKey) await secureStore.setItem(SECURE_KEYS.ALPACA_SECRET_KEY, alpacaSecretKey);
       if (pineconeKey) await secureStore.setItem(SECURE_KEYS.PINECONE_API_KEY, pineconeKey);
 
-      setSaveStatus('✅ API Credentials Encrypted & Saved to SecureStore!');
+      setSaveStatus('✅ Credentials Encrypted & Saved!');
       setTimeout(() => setSaveStatus(null), 4000);
     } catch (err) {
       setSaveStatus('❌ Error saving credentials to SecureStore');
@@ -62,7 +74,7 @@ export default function SettingsScreen() {
     if (newMode === 'LIVE') {
       Alert.alert(
         '⚠️ CONFIRM LIVE TRADING MODE',
-        'You are switching to LIVE REAL-MONEY TRADING. ATLAS will execute real market orders via Alpaca. Are you sure you are ready?',
+        'You are switching to LIVE REAL-MONEY TRADING. ATLAS will execute real market orders via Alpaca. Are you sure?',
         [
           { text: 'Keep Paper Trading', style: 'cancel' },
           {
@@ -71,8 +83,8 @@ export default function SettingsScreen() {
             onPress: () => {
               alpaca.setMode(true);
               setTradingMode('LIVE');
-            }
-          }
+            },
+          },
         ]
       );
     } else {
@@ -93,85 +105,148 @@ export default function SettingsScreen() {
           onPress: () => {
             setIsEmergencyHalted(true);
             setSaveStatus('🚨 EMERGENCY HALT ACTIVE: All trading halted.');
-          }
-        }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetAllFactory = () => {
+    Alert.alert(
+      'Factory Reset Settings',
+      'Are you sure you want to reset all model assignments, conversion ratios, and risk parameters to factory defaults?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset to Factory Defaults',
+          style: 'destructive',
+          onPress: () => {
+            resetAllSettings();
+            setSaveStatus('✅ All settings reset to factory defaults.');
+            setTimeout(() => setSaveStatus(null), 3000);
+          },
+        },
       ]
     );
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <Screen scroll padded>
+      <Stack gap={16} style={{ paddingTop: 8 }}>
+        {/* Header */}
+        <Stack gap={2}>
+          <Text variant="label" color="muted">
+            ATLAS SYSTEM CONTROL & CONFIGURATION
+          </Text>
+          <Text variant="h1" color="white">
+            System Settings
+          </Text>
+        </Stack>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <ThemedText type="small" style={{ opacity: 0.6 }}>ATLAS SYSTEM CONTROL & CREDENTIALS</ThemedText>
-            <ThemedText type="subtitle">Settings & API Gateway</ThemedText>
-          </View>
-
-          {/* Emergency Stop Banner */}
-          {isEmergencyHalted ? (
-            <ThemedView type="backgroundElement" style={styles.emergencyHaltedBanner}>
-              <ThemedText type="subtitle" style={{ color: '#FFF' }}>
+        {/* Emergency Stop Banner */}
+        {isEmergencyHalted ? (
+          <Card variant="danger" style={styles.emergencyHaltedCard}>
+            <Stack gap={6}>
+              <Text variant="h3" color="white">
                 🚨 EMERGENCY CIRCUIT BREAKER ACTIVE
-              </ThemedText>
-              <ThemedText type="small" style={{ color: '#FFF', opacity: 0.9 }}>
+              </Text>
+              <Text variant="bodySmall" color="white">
                 All bots paused. Market orders halted. Tap 'Reset System' to resume.
-              </ThemedText>
-              <TouchableOpacity
-                style={styles.resetBtn}
-                onPress={() => setIsEmergencyHalted(false)}
-              >
-                <ThemedText type="smallBold" style={{ color: '#FF1744' }}>RESET SYSTEM & RESUME</ThemedText>
+              </Text>
+              <TouchableOpacity style={styles.resetBtn} onPress={() => setIsEmergencyHalted(false)}>
+                <Text variant="bodySmall" color="red" style={{ fontWeight: 'bold' }}>
+                  RESET SYSTEM & RESUME
+                </Text>
               </TouchableOpacity>
-            </ThemedView>
-          ) : (
-            <TouchableOpacity style={styles.emergencyBtn} onPress={handleEmergencyStop}>
-              <ThemedText type="subtitle" style={{ color: '#FFF', fontSize: 15 }}>
-                🚨 EMERGENCY STOP ALL TRADING
-              </ThemedText>
-            </TouchableOpacity>
-          )}
+            </Stack>
+          </Card>
+        ) : (
+          <TouchableOpacity style={styles.emergencyBtn} onPress={handleEmergencyStop}>
+            <Text variant="h3" color="white" style={{ textAlign: 'center' }}>
+              🚨 EMERGENCY STOP ALL TRADING
+            </Text>
+          </TouchableOpacity>
+        )}
 
-          {/* Trading Mode Segmented Toggle */}
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="smallBold" style={{ opacity: 0.7 }}>TRADING MODE SELECTION</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.6 }}>
+        {/* Trading Mode Toggle */}
+        <Card variant="default">
+          <Stack gap={8}>
+            <Text variant="label" color="muted">
+              TRADING MODE SELECTION
+            </Text>
+            <Text variant="caption" color="secondary">
               Default mode is Paper Trading. Test bot strategies risk-free with virtual paper capital first before switching to real-money execution.
-            </ThemedText>
-            
+            </Text>
+
             <View style={styles.modeRow}>
               <TouchableOpacity
                 style={[styles.modeTab, tradingMode === 'PAPER' && styles.modeTabActivePaper]}
                 onPress={() => handleToggleTradingMode('PAPER')}
               >
-                <ThemedText type="smallBold" style={{ color: tradingMode === 'PAPER' ? '#000' : '#8E8E93', fontSize: 11 }}>
+                <Text variant="label" color={tradingMode === 'PAPER' ? 'white' : 'muted'} style={{ fontSize: 10 }}>
                   PAPER DEMO (SAFE)
-                </ThemedText>
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modeTab, tradingMode === 'LIVE' && styles.modeTabActiveLive]}
                 onPress={() => handleToggleTradingMode('LIVE')}
               >
-                <ThemedText type="smallBold" style={{ color: tradingMode === 'LIVE' ? '#FFF' : '#8E8E93', fontSize: 11 }}>
+                <Text variant="label" color={tradingMode === 'LIVE' ? 'white' : 'muted'} style={{ fontSize: 10 }}>
                   LIVE REAL-MONEY ⚠️
-                </ThemedText>
+                </Text>
               </TouchableOpacity>
             </View>
-          </ThemedView>
+          </Stack>
+        </Card>
 
-          {/* API Key Encryption Manager */}
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="smallBold" style={{ color: '#FF9900' }}>ENCRYPTED API CREDENTIALS</ThemedText>
-            <ThemedText type="small" style={{ opacity: 0.6 }}>
+        {/* SECTION 1: LLM MODEL SELECTION */}
+        <Stack gap={10}>
+          <Text variant="label" color="gold">
+            1. LLM MODEL ROUTING & SELECTION
+          </Text>
+          <CostPreviewBanner />
+          <ModelTaskList onSelectTask={taskKey => setActiveTaskForPicker(taskKey)} />
+        </Stack>
+
+        {/* SECTION 2: BTC COMPOUNDING */}
+        <Stack gap={10}>
+          <Text variant="label" color="gold">
+            2. BTC PROFIT COMPOUNDING
+          </Text>
+          <ConversionRatioSlider />
+        </Stack>
+
+        {/* SECTION 3: TRADING GOAL */}
+        <Stack gap={10}>
+          <Text variant="label" color="gold">
+            3. NORTH STAR ACCUMULATION GOAL
+          </Text>
+          <BtcGoalEditor />
+        </Stack>
+
+        {/* SECTION 4: RISK CONTROLS */}
+        <Stack gap={10}>
+          <Text variant="label" color="gold">
+            4. FINANCIAL SAFETY & RISK LIMITS
+          </Text>
+          <RiskLimitsEditor />
+        </Stack>
+
+        {/* SECTION 5: API KEYS MANAGER */}
+        <Card variant="default">
+          <Stack gap={10}>
+            <Text variant="h3" color="white">
+              Encrypted API Credentials
+            </Text>
+            <Text variant="caption" color="secondary">
               Credentials are encrypted on-device using hardware-backed SecureStore (Android Keystore).
-            </ThemedText>
+            </Text>
 
-            {/* OpenRouter Key */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>OpenRouter API Key (Claude Opus / Sonnet / Haiku)</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                OpenRouter API Key (Claude / Gemini / Llama)
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={openRouterKey}
@@ -180,11 +255,12 @@ export default function SettingsScreen() {
                 placeholder="sk-or-v1-..."
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            {/* Alpaca Keys */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Alpaca API Key (Paper & Live)</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Alpaca API Key (Paper & Live)
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={alpacaApiKey}
@@ -193,10 +269,12 @@ export default function SettingsScreen() {
                 placeholder="PK..."
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Alpaca Secret Key</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Alpaca Secret Key
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={alpacaSecretKey}
@@ -205,11 +283,12 @@ export default function SettingsScreen() {
                 placeholder="Secret key..."
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            {/* Pinecone Keys */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Pinecone API Key (Vector RAG Memory)</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Pinecone API Key (Vector RAG Memory)
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={pineconeKey}
@@ -218,10 +297,12 @@ export default function SettingsScreen() {
                 placeholder="pcsk_..."
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Pinecone Index Host Endpoint</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Pinecone Index Host Endpoint
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={pineconeHost}
@@ -229,11 +310,12 @@ export default function SettingsScreen() {
                 placeholder="https://atlas-index-1234.pinecone.io"
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            {/* Supabase Keys */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Project URL</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Supabase Project URL
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={supabaseUrl}
@@ -241,10 +323,12 @@ export default function SettingsScreen() {
                 placeholder="https://your-project.supabase.co"
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
-            <View style={styles.inputGroup}>
-              <ThemedText type="small" style={{ opacity: 0.8 }}>Supabase Anon Key</ThemedText>
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="secondary">
+                Supabase Anon Key
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={supabaseAnonKey}
@@ -253,112 +337,114 @@ export default function SettingsScreen() {
                 placeholder="eyJhbG..."
                 placeholderTextColor="#666"
               />
-            </View>
+            </Stack>
 
             {saveStatus && (
-              <ThemedText type="smallBold" style={{ color: '#00E676', textAlign: 'center', marginVertical: Spacing.one }}>
+              <Text variant="bodySmall" color="green" style={{ textAlign: 'center' }}>
                 {saveStatus}
-              </ThemedText>
+              </Text>
             )}
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSaveCredentials}>
-              <ThemedText type="smallBold" style={{ color: '#000' }}>SAVE CREDENTIALS TO SECURE STORE</ThemedText>
+              <Text variant="bodySmall" color="white" style={{ fontWeight: 'bold', textAlign: 'center' }}>
+                SAVE CREDENTIALS TO SECURE STORE
+              </Text>
             </TouchableOpacity>
-          </ThemedView>
+          </Stack>
+        </Card>
 
-          {/* System Info */}
-          <View style={styles.footer}>
-            <ThemedText type="small" style={{ opacity: 0.4, textAlign: 'center' }}>
-              ATLAS Autonomous Trading Engine v1.0.0 • Expo SDK 57 (Android)
-            </ThemedText>
-          </View>
+        {/* SECTION 6: DANGER ZONE */}
+        <Card variant="danger">
+          <Stack gap={8}>
+            <Text variant="h3" color="red">
+              Danger Zone
+            </Text>
+            <Text variant="caption" color="secondary">
+              Reset model choices, conversion ratios, and risk thresholds back to factory default values.
+            </Text>
 
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+            <TouchableOpacity style={styles.factoryResetBtn} onPress={handleResetAllFactory}>
+              <Text variant="bodySmall" color="red" style={{ fontWeight: 'bold', textAlign: 'center' }}>
+                RESET ALL SETTINGS TO FACTORY DEFAULTS
+              </Text>
+            </TouchableOpacity>
+          </Stack>
+        </Card>
+
+        {/* Footer */}
+        <Text variant="caption" color="muted" style={{ textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
+          ATLAS Autonomous Trading Engine v1.1 • Expo SDK 57 (Android)
+        </Text>
+      </Stack>
+
+      {/* Model Picker Bottom Sheet */}
+      <ModelPickerSheet
+        visible={Boolean(activeTaskForPicker)}
+        taskKey={activeTaskForPicker}
+        onClose={() => setActiveTaskForPicker(null)}
+        onSelect={(taskKey, modelId) => updateModelForTask(taskKey, modelId)}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  header: {
-    marginTop: Spacing.one,
-  },
   emergencyBtn: {
-    backgroundColor: '#D50000',
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    backgroundColor: '#F85149',
+    padding: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  emergencyHaltedBanner: {
-    backgroundColor: '#FF1744',
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    gap: Spacing.one,
+  emergencyHaltedCard: {
+    backgroundColor: '#3D1014',
   },
   resetBtn: {
-    backgroundColor: '#FFF',
-    padding: Spacing.two,
-    borderRadius: Spacing.two,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: Spacing.one,
-  },
-  card: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: '#161719',
-    borderWidth: 1,
-    borderColor: '#2D3035',
-    gap: Spacing.two,
+    marginTop: 4,
   },
   modeRow: {
     flexDirection: 'row',
-    backgroundColor: '#2A2C30',
-    borderRadius: Spacing.two,
+    backgroundColor: '#21262D',
+    borderRadius: 8,
     padding: 3,
   },
   modeTab: {
     flex: 1,
-    paddingVertical: Spacing.two,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: Spacing.two,
+    borderRadius: 6,
   },
   modeTabActivePaper: {
-    backgroundColor: '#FF9900',
+    backgroundColor: '#D29922',
   },
   modeTabActiveLive: {
-    backgroundColor: '#FF1744',
-  },
-  inputGroup: {
-    gap: 4,
+    backgroundColor: '#F85149',
   },
   textInput: {
-    backgroundColor: '#232529',
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    color: '#FFF',
+    backgroundColor: '#21262D',
+    borderRadius: 8,
+    padding: 10,
+    color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#34373D',
+    borderColor: '#30363D',
     fontSize: 13,
   },
   saveBtn: {
-    backgroundColor: '#FF9900',
-    padding: Spacing.three,
-    borderRadius: Spacing.two,
+    backgroundColor: '#D29922',
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: Spacing.one,
+    marginTop: 4,
   },
-  footer: {
-    marginTop: Spacing.two,
-    marginBottom: Spacing.four,
+  factoryResetBtn: {
+    backgroundColor: '#21262D',
+    borderWidth: 1,
+    borderColor: '#F85149',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });

@@ -64,46 +64,29 @@ We have divided the implementation of ATLAS into 5 sequential phases based on th
 - [x] End-to-end 5-phase system health verification test suite (`test-phase5.ts`).
 - [x] Android packaging & standalone build config (`app.json`: `package: "com.atlas.autonomous.trading"`).
 
+### ✅ ATLAS v1.1: Model Selection + Configurable Settings + Responsive Foundation
+*System-wide responsive redesign, per-task LLM model picker, configurable 80/20 profit split slider, editable target BTC goal, and code-level risk limits.*
+- [x] Responsive Foundation (`useResponsive.ts`, `Screen.tsx`, `Row.tsx`, `Stack.tsx`, `Card.tsx`, `Text.tsx`, `responsive.ts`).
+- [x] Settings Data Layer & Store (`settings.ts`, `settingsStore.ts` with Zustand & `AsyncStorage` persistence).
+- [x] LLM Model Selection UI (`ModelPickerSheet.tsx`, `ModelTaskList.tsx`, `CostPreviewBanner.tsx` with live cost estimates).
+- [x] Configurable Settings Controls (`ConversionRatioSlider.tsx`, `BtcGoalEditor.tsx`, `RiskLimitsEditor.tsx`).
+- [x] OpenRouter & BTC Conversion Integration (`openrouter.ts`, `btcConversion.ts`, `settings.tsx`, `index.tsx`).
+
 ---
 
 ## Development Log & Version History
 
-### [2026-07-25] Phase 0: Repository Setup & Project Roadmap
-- **Action:** Analyzed `ATLAS_PRD_v1.md`, established implementation plan divided into 5 phases.
-- **Artifacts:** Created `docs/memory.md` to track progress.
-- **Git Commit:** Initialized Git repository, added PRD and Memory files, and pushed to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 0 complete.
-
-### [2026-07-25] Phase 1: Foundation & Integration Complete
-- **Action:** Initialized Expo SDK 57 project with TypeScript, configured tab navigation, built services for Alpaca (`alpaca.ts`), OpenRouter (`openrouter.ts`), Pinecone (`pinecone.ts`), SQLite (`db.ts`), SecureStore (`secureStore.ts`), and Market Regime detection (`regime.ts`).
-- **UI:** Designed Mission Control Home Screen (`src/app/index.tsx`) with 20 BTC progress bar, Live Regime badge, account metrics, seed bot cards, and news ticker. Created screen placeholders (`bot_arena.tsx`, `trade_feed.tsx`, `intelligence.tsx`, `btc_stack.tsx`, `settings.tsx`).
-- **Validation:** Verification script `test-connections.js` created and executed. Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
-- **Git Commit:** Pushed Phase 1 codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 1 complete.
-
-### [2026-07-25] Phase 2: Bot Genome & Strategy Engine Complete
-- **Action:** Created `src/types/genome.ts`, Zod schema `genomeSchema.ts`, technical indicators `indicators.ts` (RSI, VWAP, Bollinger Bands, Volume Spike, Momentum), seed genomes `seedGenomes.ts` (`atlas_001` Momentum Hunter and `atlas_002` Mean Reversion), signal evaluation engine `signals.ts`, 3-trigger death monitor `deathMonitor.ts` with Champion crown protection, probation manager `probation.ts` for 20-trade evaluation windows, and Claude Opus strategy generation `replacementEngine.ts`.
-- **UI:** Implemented interactive Bot Arena Screen (`src/app/bot_arena.tsx`) with expandable bot cards, composite health score tracks, death trigger badges, probation progress indicators, and Kill Feed / Hall of Fame ledger.
-- **Validation:** Built and ran `src/scripts/test-phase2.ts` test suite. All tests passed. Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
-- **Git Commit:** Pushed Phase 2 codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 2 complete.
-
-### [2026-07-25] Phase 3: Intelligence & Vector Memory Layer Complete
-- **Action:** Implemented `newsEngine.ts` for headline classification via Claude Haiku (`HaikuNewsClassificationSchema`), `tradeDna.ts` for formatting semantic trade text and 1536-dim OpenRouter embeddings, `decisionEngine.ts` for pre-trade Pinecone RAG similarity search and Claude Opus decision analysis (`DecisionSchema`), `reflectionEngine.ts` for post-trade Claude Sonnet reflections (`ReflectionSchema`), and `rollback.ts` for 15-trade post-mutation performance tracking and auto-rollback.
-- **UI:** Implemented interactive Trade Feed Screen (`src/app/trade_feed.tsx`) with filter chips (All/Wins/Losses), expandable trade cards, full Opus pre-trade decision reasoning, top-3 Pinecone RAG matches, and Sonnet reflections.
-- **Validation:** Executed `test-phase3.ts` test suite (`PASSED`). Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
-- **Git Commit:** Pushed Phase 3 codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 3 complete.
-
-### [2026-07-25] Phase 4: Risk Management & Profit Compounding Complete
-- **Action:** Created `sizing.ts` for confidence-gated position sizing and regime multipliers, `riskEngine.ts` implementing the 9 immutable hard risk rules at code level, `btcConversion.ts` for 80/20 profit splitting, >0.8% dip-aware execution, and SQLite `btc_stack` logging, and `profitLock.ts` protecting 70% of peak daily gains via dynamic stop loss floors.
-- **UI:** Implemented interactive BTC Stack Screen (`src/app/btc_stack.tsx`) with hero 20 BTC progress bar, milestone badges (0.1, 0.5, 1, 5, 10, 20 BTC), weighted average cost-basis, and conversion history ledger.
-- **Validation:** Executed `test-phase4.ts` test suite (`PASSED`). Zero TypeScript compilation errors (`npx tsc --noEmit` clean).
-- **Git Commit:** Pushed Phase 4 codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Phase 4 complete.
-
-### [2026-07-25] Phase 5: UI Polish, Testing & Deployment Complete
-- **Action:** Implemented Market Intelligence UI dashboard (`intelligence.tsx`) with live regime card, 30-day timeline, classified news feed, and Fear & Greed index, Settings UI (`settings.tsx`) with hardware-backed SecureStore key manager, Paper/Live mode toggle, and Emergency Stop All circuit breaker, push notifications service (`notifications.ts`), and updated `app.json` for Android package (`com.atlas.autonomous.trading`).
-- **Validation:** Executed `test-phase5.ts` end-to-end test suite (`PASSED`). Zero TypeScript compilation errors (`npx tsc --noEmit` clean across all 5 phases).
-- **Git Commit:** Pushed Phase 5 codebase to `https://github.0/abdulah-0/ATLAS.git`.
-- **Status:** Phase 5 complete. All 5 phases fully realized and delivered.
+### [2026-07-30] ATLAS v1.1 Feature Implementation Complete
+- **Action:** Executed full v1.1 implementation plan per `docs/ATLAS_Implementation_Plan.md`.
+- **Components Built:**
+  - `useResponsive` hook with 5 breakpoint scale (`xs`, `sm`, `md`, `lg`, `xl`) and scaled typography/spacing.
+  - Layout primitives: `Screen`, `Row`, `Stack`, `Card`.
+  - Typography system: `Text` with `numberOfLines` truncation & font scaling controls.
+  - Responsive utilities: `fitFontSize`, `truncateModelId`, `safePercent`.
+  - Settings data layer: `types/settings.ts` (10 LLM tasks) and `store/settingsStore.ts` (Zustand + `AsyncStorage`).
+  - Model Selection UI: `ModelPickerSheet`, `ModelTaskList`, `CostPreviewBanner` with live monthly cost estimate ($/mo).
+  - Configurable Settings: `ConversionRatioSlider` (10–95% range), `BtcGoalEditor` (decimal input + milestones), `RiskLimitsEditor` (risk per trade, max position, daily loss halt, drawdown circuit breaker).
+  - Integrated `openrouter.ts`, `btcConversion.ts`, `settings.tsx`, and `index.tsx`.
+- **Validation:** Executed verification test suite (`PASSED`). TypeScript compilation clean (`npx tsc --noEmit` 0 errors).
+- **Git Commit:** Pushed v1.1 codebase to `https://github.com/abdulah-0/ATLAS.git`.
+- **Status:** v1.1 complete.

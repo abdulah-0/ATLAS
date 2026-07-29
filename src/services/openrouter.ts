@@ -1,19 +1,13 @@
 import { secureStore, SECURE_KEYS } from './secureStore';
+import { useSettingsStore } from '../store/settingsStore';
+import { LLMTaskKey } from '../types/settings';
 
 export const OPENROUTER_MODELS = {
-  // Premium - Decisions, complex reasoning
-  OPUS: 'anthropic/claude-3-opus',
-  
-  // Mid-Tier - Post-trade reflection, mutations
-  SONNET: 'anthropic/claude-3.5-sonnet',
-  
-  // Cheap - News digests, confidence scoring
-  HAIKU: 'anthropic/claude-3-haiku',
-  
-  // Free - Logs, basic utilities
+  // Static defaults fallback
+  OPUS: 'anthropic/claude-opus-4-6',
+  SONNET: 'anthropic/claude-sonnet-4-6',
+  HAIKU: 'anthropic/claude-haiku-4-5-20251001',
   LLAMA_FREE: 'meta-llama/llama-3.1-8b-instruct:free',
-  
-  // Embedding model (OpenRouter or OpenAI direct)
   EMBEDDING: 'openai/text-embedding-3-small',
 };
 
@@ -48,9 +42,25 @@ export const openrouter = {
     return {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/abdulah-0/ATLAS', // Required by OpenRouter
+      'HTTP-Referer': 'https://github.com/abdulah-0/ATLAS',
       'X-Title': 'ATLAS Autonomous Trading Bot',
     };
+  },
+
+  /**
+   * Retrieves the configured model ID for a specific task from settings store
+   */
+  getModelForTask(taskKey: LLMTaskKey): string {
+    try {
+      const { settings } = useSettingsStore.getState();
+      const assignment = settings.models[taskKey];
+      if (assignment && assignment.modelId) {
+        return assignment.modelId;
+      }
+    } catch (e) {
+      console.log('Using default fallback model for task', taskKey);
+    }
+    return OPENROUTER_MODELS.OPUS;
   },
 
   async chatComplete(
@@ -92,10 +102,6 @@ export const openrouter = {
     return content;
   },
 
-  /**
-   * Generates a 1536-dimension embedding vector for the given text.
-   * Routes to the embedding endpoint.
-   */
   async getEmbedding(text: string): Promise<number[]> {
     const headers = await this.getHeaders();
     
@@ -104,7 +110,6 @@ export const openrouter = {
       input: text,
     };
 
-    // OpenRouter supports standard OpenAI-compatible embeddings
     const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
       method: 'POST',
       headers,

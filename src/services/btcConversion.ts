@@ -1,6 +1,7 @@
 import { dbOperations } from './db';
 import { RegimeType } from './regime';
 import { alpaca } from './alpaca';
+import { useSettingsStore } from '../store/settingsStore';
 
 export interface ConversionQueueItem {
   usdAmount: number;
@@ -19,15 +20,23 @@ export interface ConversionResult {
 
 export const btcConversion = {
   /**
-   * Processes a closed trade's profit: 80% to BTC queue, 20% to bot capital
+   * Processes a closed trade's profit based on configured conversion ratio (default 80/20)
    */
   processProfitSplit(netProfitUsd: number, tradeId: string): { btcQueueUsd: number; botReinvestUsd: number } {
     if (netProfitUsd <= 0) {
       return { btcQueueUsd: 0, botReinvestUsd: 0 };
     }
 
-    const btcQueueUsd = parseFloat((netProfitUsd * 0.80).toFixed(2));
-    const botReinvestUsd = parseFloat((netProfitUsd * 0.20).toFixed(2));
+    let btcRatio = 0.80;
+    try {
+      const { conversion } = useSettingsStore.getState().settings;
+      btcRatio = (conversion.conversionRatio || 80) / 100;
+    } catch (e) {
+      console.log('Using default 80% BTC split ratio');
+    }
+
+    const btcQueueUsd = parseFloat((netProfitUsd * btcRatio).toFixed(2));
+    const botReinvestUsd = parseFloat((netProfitUsd * (1 - btcRatio)).toFixed(2));
 
     return { btcQueueUsd, botReinvestUsd };
   },
@@ -51,26 +60,38 @@ export const btcConversion = {
       reason,
     });
 
-    // Minimum conversion threshold: $5
-    if (usdAmount < 5.0) {
-      return defaultHold(`Queued amount $${usdAmount.toFixed(2)} is below minimum $5 threshold. Held in queue.`);
+    let minConvertUsd = 5.0;
+    let dipThresholdPct = 0.8;
+    let pauseInCrash = true;
+
+    try {
+      const { conversion } = useSettingsStore.getState().settings;
+      minConvertUsd = conversion.minConvertUsd ?? 5.0;
+      dipThresholdPct = conversion.dipThresholdPct ?? 0.8;
+      pauseInCrash = conversion.pauseInCrash ?? true;
+    } catch (e) {
+      // Use defaults
     }
 
-    // Regime Check: If CRASH, hold profit in USDC
-    if (currentRegime === 'CRASH') {
+    // Minimum conversion threshold check
+    if (usdAmount < minConvertUsd) {
+      return defaultHold(`Queued amount $${usdAmount.toFixed(2)} is below minimum $${minConvertUsd.toFixed(2)} threshold. Held in queue.`);
+    }
+
+    // Regime Check: If CRASH and pauseInCrash active, hold profit in USDC
+    if (pauseInCrash && currentRegime === 'CRASH') {
       return defaultHold(`BTC CRASH regime active. $${usdAmount.toFixed(2)} profit held in USDC queue.`);
     }
 
-    // Dip-aware check: Look for > 0.8% dip in recent 4h bars
+    // Dip-aware check
     let isDipDetected = false;
     if (recent4hBtcBars && recent4hBtcBars.length >= 2) {
       const highest4hPrice = Math.max(...recent4hBtcBars.map(b => b.c));
       const dipPct = ((highest4hPrice - currentBtcPrice) / highest4hPrice) * 100;
-      if (dipPct >= 0.8) {
+      if (dipPct >= dipThresholdPct) {
         isDipDetected = true;
       }
     } else {
-      // If insufficient bar data, default to executing conversion
       isDipDetected = true;
     }
 

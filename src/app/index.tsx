@@ -4,14 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
 import { alpaca, AlpacaAccount } from '../services/alpaca';
 import { regimeDetector, RegimeResult } from '../services/regime';
 import { secureStore, SECURE_KEYS } from '../services/secureStore';
 import { dbOperations } from '../services/db';
+import { useSettingsStore } from '../store/settingsStore';
 
 export default function MissionControlScreen() {
   const router = useRouter();
+  const targetBtcGoal = useSettingsStore(state => state.settings.goal.targetBtc);
+
   const [hasKeys, setHasKeys] = useState<boolean | null>(null);
   const [isPaperMode, setIsPaperMode] = useState<boolean>(true);
   const [account, setAccount] = useState<AlpacaAccount | null>(null);
@@ -27,18 +29,15 @@ export default function MissionControlScreen() {
   const checkSetupAndLoadData = async () => {
     setLoading(true);
     try {
-      // 1. Check if keys exist in SecureStore
       const openRouterKey = await secureStore.getItem(SECURE_KEYS.OPENROUTER_API_KEY);
       const alpacaKey = await secureStore.getItem(SECURE_KEYS.ALPACA_API_KEY);
 
       const keysPresent = Boolean(openRouterKey || alpacaKey);
       setHasKeys(keysPresent);
 
-      // 2. Fetch live regime
       const currentRegime = regimeDetector.detectRegime([]);
       setRegime(currentRegime);
 
-      // 3. Load active bots count from DB
       try {
         const activeBots = await dbOperations.getActiveBots();
         setBotsCount(activeBots.length);
@@ -46,7 +45,6 @@ export default function MissionControlScreen() {
         setBotsCount(2);
       }
 
-      // 4. Load BTC stack total
       try {
         const btcTotal = await dbOperations.getBtcStackTotal();
         setTotalBtc(btcTotal);
@@ -54,7 +52,6 @@ export default function MissionControlScreen() {
         setTotalBtc(0);
       }
 
-      // 5. Try fetching paper trading account if keys present
       if (keysPresent) {
         try {
           const acc = await alpaca.getAccount();
@@ -70,7 +67,7 @@ export default function MissionControlScreen() {
     }
   };
 
-  const btcProgressPct = Math.min(100, (totalBtc / 20.0) * 100);
+  const btcProgressPct = Math.min(100, (totalBtc / targetBtcGoal) * 100);
 
   return (
     <ThemedView style={styles.container}>
@@ -111,10 +108,10 @@ export default function MissionControlScreen() {
             </TouchableOpacity>
           )}
 
-          {/* 20 BTC Hero Card */}
+          {/* BTC Hero Card */}
           <ThemedView type="backgroundElement" style={styles.heroCard}>
             <View style={styles.cardHeaderRow}>
-              <ThemedText type="smallBold" style={styles.cardTag}>20 BTC NORTH STAR GOAL</ThemedText>
+              <ThemedText type="smallBold" style={styles.cardTag}>{targetBtcGoal} BTC NORTH STAR GOAL</ThemedText>
               <ThemedText type="smallBold" style={{ color: '#FF9900' }}>
                 {btcProgressPct.toFixed(4)}%
               </ThemedText>
