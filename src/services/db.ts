@@ -1,17 +1,18 @@
 import * as SQLite from 'expo-sqlite';
+import { StoredForecast } from '../types/kronos';
+import { LogEvent } from '../types/logs';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (dbInstance) return dbInstance;
-  
+
   dbInstance = await SQLite.openDatabaseAsync('atlas.db');
   await initSchema(dbInstance);
   return dbInstance;
 }
 
 async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
-  // Enable WAL journal mode and foreign keys
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -22,13 +23,13 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE TABLE IF NOT EXISTS bots (
       id                  TEXT PRIMARY KEY,
       generation          INTEGER DEFAULT 1,
-      parent_ids          TEXT,              -- JSON array
-      genome              TEXT NOT NULL,     -- JSON BotGenome
-      status              TEXT DEFAULT 'probation', -- probation|active|champion|dead
+      parent_ids          TEXT,
+      genome              TEXT NOT NULL,
+      status              TEXT DEFAULT 'probation',
       allocation_pct      REAL,
       created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       died_at             TIMESTAMP,
-      death_reasons       TEXT,              -- JSON array
+      death_reasons       TEXT,
       total_trades        INTEGER DEFAULT 0,
       win_count           INTEGER DEFAULT 0,
       loss_count          INTEGER DEFAULT 0,
@@ -45,8 +46,8 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       id               TEXT PRIMARY KEY,
       bot_id           TEXT REFERENCES bots(id),
       asset            TEXT NOT NULL,
-      asset_class      TEXT,                -- crypto|stock
-      direction        TEXT,                -- long|short
+      asset_class      TEXT,
+      direction        TEXT,
       signal_type      TEXT,
       entry_price      REAL,
       exit_price       REAL,
@@ -59,6 +60,10 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       hmm_confidence   REAL,
       opus_confidence  REAL,
       opus_reasoning   TEXT,
+      bull_case        TEXT,
+      bear_case        TEXT,
+      risk_flags       TEXT,
+      kronos_alignment TEXT,
       news_digest_id   TEXT,
       pinecone_id      TEXT,
       what_worked      TEXT,
@@ -87,11 +92,11 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE TABLE IF NOT EXISTS genome_mutations (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       bot_id            TEXT,
-      mutation_type     TEXT,               -- 'auto'|'manual'
-      genome_before     TEXT,               -- JSON snapshot for rollback
+      mutation_type     TEXT,
+      genome_before     TEXT,
       genome_after      TEXT,
       trigger_reason    TEXT,
-      performance_delta REAL,               -- win rate change post-mutation
+      performance_delta REAL,
       rolled_back       INTEGER DEFAULT 0,
       applied_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -100,132 +105,157 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   // Create news_events table
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS news_events (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      headline        TEXT,
-      source          TEXT,
-      asset           TEXT,
-      sentiment       TEXT,
-      urgency         TEXT,
-      trade_relevant  INTEGER,
-      influenced_trade TEXT,               -- trade_id if news affected a decision
-      published_at    TIMESTAMP,
-      classified_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id            TEXT PRIMARY KEY,
+      asset         TEXT,
+      headline      TEXT NOT NULL,
+      sentiment     TEXT,
+      impact_score  REAL,
+      published_at  TIMESTAMP
     );
+  `);
+
+  // Create kronos_forecasts table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS kronos_forecasts (
+      id                   TEXT PRIMARY KEY,
+      trade_id             TEXT,
+      bot_id               TEXT,
+      asset                TEXT NOT NULL,
+      timeframe            TEXT NOT NULL,
+      direction            TEXT NOT NULL,
+      direction_confidence REAL,
+      predicted_change_pct REAL,
+      predicted_high_pct   REAL,
+      predicted_low_pct    REAL,
+      volatility_regime    TEXT,
+      volatility_score     REAL,
+      forecast_confidence  REAL,
+      path_agreement       REAL,
+      model_used           TEXT,
+      bars_used            INTEGER,
+      actual_change_pct    REAL,
+      was_correct          INTEGER,
+      requested_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      responded_at         TIMESTAMP,
+      latency_ms           INTEGER
+    );
+  `);
+
+  // Create ohlcv_cache table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS ohlcv_cache (
+      asset       TEXT NOT NULL,
+      timeframe   TEXT NOT NULL,
+      timestamp   TEXT NOT NULL,
+      open        REAL NOT NULL,
+      high        REAL NOT NULL,
+      low         REAL NOT NULL,
+      close       REAL NOT NULL,
+      volume      REAL,
+      PRIMARY KEY (asset, timeframe, timestamp)
+    );
+  `);
+
+  // Create trim_ohlcv_cache trigger
+  await db.execAsync(`
+    CREATE TRIGGER IF NOT EXISTS trim_ohlcv_cache AFTER INSERT ON ohlcv_cache
+    BEGIN
+      DELETE FROM ohlcv_cache
+      WHERE asset = NEW.asset AND timeframe = NEW.timeframe
+        AND timestamp NOT IN (
+          SELECT timestamp FROM ohlcv_cache
+          WHERE asset = NEW.asset AND timeframe = NEW.timeframe
+          ORDER BY timestamp DESC LIMIT 500
+        );
+    END;
+  `);
+
+  // Create log_events table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS log_events (
+      id          TEXT PRIMARY KEY,
+      timestamp   TIMESTAMP NOT NULL,
+      level       TEXT NOT NULL,
+      category    TEXT NOT NULL,
+      bot_id      TEXT,
+      trade_id    TEXT,
+      asset       TEXT,
+      title       TEXT NOT NULL,
+      detail      TEXT,
+      metadata    TEXT,
+      is_read     INTEGER DEFAULT 0
+    );
+  `);
+
+  // Create trim_log_events trigger
+  await db.execAsync(`
+    CREATE TRIGGER IF NOT EXISTS trim_log_events AFTER INSERT ON log_events
+    BEGIN
+      DELETE FROM log_events
+      WHERE id NOT IN (SELECT id FROM log_events ORDER BY timestamp DESC LIMIT 2000);
+    END;
+  `);
+
+  // Create kronos_accuracy view
+  await db.execAsync(`
+    CREATE VIEW IF NOT EXISTS kronos_accuracy AS
+    SELECT
+      asset,
+      timeframe,
+      model_used,
+      COUNT(*) AS total_forecasts,
+      SUM(CASE WHEN was_correct = 1 THEN 1 ELSE 0 END) AS correct,
+      ROUND(100.0 * SUM(CASE WHEN was_correct = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) AS accuracy_pct,
+      ROUND(AVG(latency_ms), 0) AS avg_latency_ms
+    FROM kronos_forecasts
+    WHERE was_correct IS NOT NULL
+    GROUP BY asset, timeframe, model_used;
   `);
 }
 
-// Utility operations to simplify data access
 export const dbOperations = {
-  // Bots
-  async insertBot(bot: any): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
-      `INSERT INTO bots (id, generation, parent_ids, genome, status, allocation_pct, sharpe_30d) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      bot.id,
-      bot.generation ?? 1,
-      JSON.stringify(bot.parent_ids ?? []),
-      JSON.stringify(bot.genome),
-      bot.status ?? 'probation',
-      bot.allocation_pct ?? 0,
-      bot.sharpe_30d ?? 0
-    );
-  },
-
   async getActiveBots(): Promise<any[]> {
     const db = await getDb();
-    return db.getAllAsync(`SELECT * FROM bots WHERE status IN ('active', 'probation', 'champion')`);
+    return db.getAllAsync(`SELECT * FROM bots WHERE status != 'dead' ORDER BY created_at DESC`);
   },
 
-  async updateBotPerformance(
-    botId: string, 
-    pnlUsd: number, 
-    isWin: boolean, 
-    currentDrawdown: number, 
-    consecutiveLosses: number
-  ): Promise<void> {
+  async getTrades(): Promise<any[]> {
     const db = await getDb();
-    const winIncrement = isWin ? 1 : 0;
-    const lossIncrement = isWin ? 0 : 1;
+    return db.getAllAsync(`SELECT * FROM trades ORDER BY opened_at DESC LIMIT 50`);
+  },
 
+  async insertTrade(t: any): Promise<void> {
+    const db = await getDb();
     await db.runAsync(
-      `UPDATE bots 
-       SET total_trades = total_trades + 1,
-           win_count = win_count + ?,
-           loss_count = loss_count + ?,
-           total_pnl_usd = total_pnl_usd + ?,
-           current_drawdown = ?,
-           consecutive_losses = ?
-       WHERE id = ?`,
-      winIncrement,
-      lossIncrement,
-      pnlUsd,
-      currentDrawdown,
-      consecutiveLosses,
-      botId
+      `INSERT INTO trades 
+       (id, bot_id, asset, asset_class, direction, signal_type, entry_price, stop_loss, take_profit, quantity, regime, hmm_confidence, opus_confidence, opus_reasoning, bull_case, bear_case, risk_flags, kronos_alignment)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      t.id,
+      t.bot_id,
+      t.asset,
+      t.asset_class,
+      t.direction,
+      t.signal_type,
+      t.entry_price,
+      t.stop_loss,
+      t.take_profit ?? null,
+      t.quantity,
+      t.regime,
+      t.hmm_confidence,
+      t.opus_confidence,
+      t.opus_reasoning,
+      t.bull_case ?? null,
+      t.bear_case ?? null,
+      t.risk_flags ?? null,
+      t.kronos_alignment ?? null
     );
   },
 
-  async killBot(botId: string, deathReasons: string[]): Promise<void> {
+  async closeTrade(tradeId: string, exitPrice: number, pnlUsd: number, pnlPct: number, whatWorked: string | null, whatFailed: string | null, ruleUpdate: string | null): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `UPDATE bots 
-       SET status = 'dead', 
-           died_at = CURRENT_TIMESTAMP, 
-           death_reasons = ? 
-       WHERE id = ?`,
-      JSON.stringify(deathReasons),
-      botId
-    );
-  },
-
-  // Trades
-  async insertTrade(trade: any): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
-      `INSERT INTO trades (
-        id, bot_id, asset, asset_class, direction, signal_type, entry_price, 
-        stop_loss, take_profit, quantity, status, regime, hmm_confidence, 
-        opus_confidence, opus_reasoning, news_digest_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)`,
-      trade.id,
-      trade.bot_id,
-      trade.asset,
-      trade.asset_class,
-      trade.direction,
-      trade.signal_type,
-      trade.entry_price,
-      trade.stop_loss,
-      trade.take_profit ?? null,
-      trade.quantity,
-      trade.regime,
-      trade.hmm_confidence ?? 1.0,
-      trade.opus_confidence,
-      trade.opus_reasoning,
-      trade.news_digest_id ?? null
-    );
-  },
-
-  async closeTrade(
-    tradeId: string, 
-    exitPrice: number, 
-    pnlUsd: number, 
-    pnlPct: number, 
-    whatWorked: string | null, 
-    whatFailed: string | null, 
-    ruleUpdate: string | null
-  ): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
-      `UPDATE trades 
-       SET status = 'closed',
-           exit_price = ?,
-           pnl_usd = ?,
-           pnl_pct = ?,
-           what_worked = ?,
-           what_failed = ?,
-           rule_update = ?,
-           closed_at = CURRENT_TIMESTAMP
+      `UPDATE trades
+       SET status = 'closed', exit_price = ?, pnl_usd = ?, pnl_pct = ?, what_worked = ?, what_failed = ?, rule_update = ?, closed_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       exitPrice,
       pnlUsd,
@@ -237,45 +267,95 @@ export const dbOperations = {
     );
   },
 
-  async getTrades(limit: number = 50): Promise<any[]> {
+  async insertNewsEvents(events: any[]): Promise<void> {
     const db = await getDb();
-    return db.getAllAsync(`SELECT * FROM trades ORDER BY opened_at DESC LIMIT ?`, limit);
-  },
-
-  // BTC Stack
-  async logBtcPurchase(btcAmount: number, usdSpent: number, price: number, sourceTradeId: string | null): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
-      `INSERT INTO btc_stack (btc_amount, usd_spent, btc_price_at_buy, source_trade_id) 
-       VALUES (?, ?, ?, ?)`,
-      btcAmount,
-      usdSpent,
-      price,
-      sourceTradeId
-    );
+    for (const e of events) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO news_events (id, asset, headline, sentiment, impact_score, published_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        e.id,
+        e.asset,
+        e.headline,
+        e.sentiment,
+        e.impact_score,
+        e.published_at
+      );
+    }
   },
 
   async getBtcStackTotal(): Promise<number> {
     const db = await getDb();
-    const result: any = await db.getFirstAsync(`SELECT SUM(btc_amount) as total FROM btc_stack`);
+    const result = await db.getFirstAsync<{ total: number }>(`SELECT SUM(btc_amount) as total FROM btc_stack`);
     return result?.total ?? 0;
   },
 
-  // News Events
-  async insertNewsEvents(events: any[]): Promise<void> {
+  async logBtcPurchase(btcAmount: number, usdSpent: number, btcPrice: number, tradeId: string | null): Promise<void> {
     const db = await getDb();
-    for (const event of events) {
-      await db.runAsync(
-        `INSERT INTO news_events (headline, source, asset, sentiment, urgency, trade_relevant, published_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        event.headline,
-        event.source,
-        event.asset,
-        event.sentiment,
-        event.urgency,
-        event.trade_relevant ? 1 : 0,
-        event.published_at
-      );
-    }
-  }
+    await db.runAsync(
+      `INSERT INTO btc_stack (btc_amount, usd_spent, btc_price_at_buy, source_trade_id) VALUES (?, ?, ?, ?)`,
+      btcAmount,
+      usdSpent,
+      btcPrice,
+      tradeId
+    );
+  },
+
+  async logKronosForecast(f: StoredForecast): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(
+      `INSERT INTO kronos_forecasts 
+       (id, trade_id, asset, timeframe, direction, direction_confidence, predicted_change_pct, volatility_regime, forecast_confidence, requested_at, responded_at, latency_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      f.id,
+      f.trade_id ?? null,
+      f.asset,
+      f.timeframe,
+      f.direction,
+      f.direction_confidence,
+      f.predicted_change_pct,
+      f.volatility_regime,
+      f.forecast_confidence,
+      f.requested_at,
+      f.responded_at,
+      f.latency_ms
+    );
+  },
+
+  async getKronosAccuracy(): Promise<any[]> {
+    const db = await getDb();
+    return db.getAllAsync(`SELECT * FROM kronos_accuracy`);
+  },
+
+  async insertLogEvent(e: LogEvent): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(
+      `INSERT INTO log_events (id, timestamp, level, category, bot_id, trade_id, asset, title, detail, metadata, is_read)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      e.id,
+      e.timestamp,
+      e.level,
+      e.category,
+      e.bot_id ?? null,
+      e.trade_id ?? null,
+      e.asset ?? null,
+      e.title,
+      e.detail ?? null,
+      e.metadata ? JSON.stringify(e.metadata) : null,
+      e.is_read ? 1 : 0
+    );
+  },
+
+  async getLogEvents(limit = 100): Promise<LogEvent[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(`SELECT * FROM log_events ORDER BY timestamp DESC LIMIT ?`, limit);
+    return rows.map(r => ({
+      ...r,
+      is_read: Boolean(r.is_read),
+      metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+    }));
+  },
+
+  async markAllLogsRead(): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(`UPDATE log_events SET is_read = 1 WHERE is_read = 0`);
+  },
 };

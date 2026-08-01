@@ -3,8 +3,8 @@ import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
 import { dbOperations } from '../services/db';
+import { KronosAlignmentBadge } from '../components/trades/KronosAlignmentBadge';
 
 export default function TradeFeedScreen() {
   const [filter, setFilter] = useState<'all' | 'wins' | 'losses'>('all');
@@ -37,7 +37,7 @@ export default function TradeFeedScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
 
-        {/* Filter Bar Header - Scrollable to prevent horizontal overflow */}
+        {/* Filter Bar Header */}
         <View style={styles.filterHeaderWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterHeader}>
             <TouchableOpacity 
@@ -103,6 +103,7 @@ export default function TradeFeedScreen() {
                               {trade.direction?.toUpperCase()}
                             </ThemedText>
                           </View>
+                          <KronosAlignmentBadge alignment={trade.kronos_alignment} />
                           <ThemedText type="small" style={{ opacity: 0.6 }}>{trade.opened_at || 'Just now'}</ThemedText>
                         </View>
                         
@@ -121,7 +122,7 @@ export default function TradeFeedScreen() {
                       </View>
                     </View>
 
-                    {/* Price Levels Row - Responsive flexWrap */}
+                    {/* Price Levels Row */}
                     <View style={styles.priceRow}>
                       <ThemedText type="small" style={{ opacity: 0.7 }}>
                         Entry: ${trade.entry_price}
@@ -138,9 +139,21 @@ export default function TradeFeedScreen() {
                     {isExpanded && (
                       <View style={styles.expandedSection}>
                         <View style={styles.divider} />
-                        <ThemedText type="smallBold" style={{ color: '#FF9900' }}>CLAUDE OPUS PRE-TRADE REASONING</ThemedText>
+                        {trade.bull_case && (
+                          <View style={{ marginBottom: 6 }}>
+                            <ThemedText type="smallBold" style={{ color: '#00E676' }}>🐂 BULL CASE</ThemedText>
+                            <ThemedText type="small" style={{ opacity: 0.8 }}>{trade.bull_case}</ThemedText>
+                          </View>
+                        )}
+                        {trade.bear_case && (
+                          <View style={{ marginBottom: 6 }}>
+                            <ThemedText type="smallBold" style={{ color: '#FF1744' }}>🐻 BEAR CASE</ThemedText>
+                            <ThemedText type="small" style={{ opacity: 0.8 }}>{trade.bear_case}</ThemedText>
+                          </View>
+                        )}
+                        <ThemedText type="smallBold" style={{ color: '#FF9900' }}>CLAUDE OPUS DECISION REASONING</ThemedText>
                         <ThemedText type="small" style={styles.reasoningText}>
-                          "{trade.opus_reasoning || 'Signal approved by Opus RAG evaluation.'}"
+                          "{trade.opus_reasoning || 'Signal approved by Opus evaluation.'}"
                         </ThemedText>
                       </View>
                     )}

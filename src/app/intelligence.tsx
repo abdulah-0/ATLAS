@@ -3,8 +3,8 @@ import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
 import { regimeDetector, RegimeResult } from '../services/regime';
+import { KronosForecastPanel } from '../components/intelligence/KronosForecastPanel';
 
 export default function IntelligenceScreen() {
   const [assetFilter, setAssetFilter] = useState<'ALL' | 'BTC' | 'ETH' | 'NVDA'>('ALL');
@@ -36,6 +36,11 @@ export default function IntelligenceScreen() {
     }
   };
 
+  const newsFeedItems = [
+    { id: '1', asset: 'BTC', tone: 'BULLISH', text: 'Alpaca Paper Trading Account Ready. Signal Engine monitoring 15m and 1h bars for entry triggers.' },
+    { id: '2', asset: 'ETH', tone: 'NEUTRAL', text: 'Ethereum Layer 2 activity shows steady gas usage without spike.' },
+  ];
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -59,16 +64,16 @@ export default function IntelligenceScreen() {
             <View style={styles.regimeMainRow}>
               <View style={styles.regimeBadgeGroup}>
                 <View style={[styles.regimeDot, { backgroundColor: getRegimeColor(currentRegimeName) }]} />
-                <ThemedText type="title" style={{ color: getRegimeColor(currentRegimeName), fontSize: 26 }}>
+                <ThemedText type="title" style={{ color: getRegimeColor(currentRegimeName), fontSize: 26 }} numberOfLines={1}>
                   {currentRegimeName}
                 </ThemedText>
               </View>
 
-              <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+              <View style={{ alignItems: 'flex-end', flexShrink: 0, minWidth: 80 }}>
                 <ThemedText type="subtitle" style={{ color: '#FF9900' }}>
                   {confidencePct}% CONF
                 </ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6 }}>HMM Multiplier: 1.0x</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>HMM: 1.0x</ThemedText>
               </View>
             </View>
 
@@ -85,11 +90,14 @@ export default function IntelligenceScreen() {
             </View>
           </ThemedView>
 
+          {/* Kronos Deep-Learning Forecast Panel */}
+          <KronosForecastPanel />
+
           {/* Fear & Greed + Calendar Grid */}
           <View style={styles.gridRow}>
             {/* Fear & Greed Card */}
             <ThemedView type="backgroundElement" style={styles.gridCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>FEAR & GREED INDEX</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>FEAR & GREED</ThemedText>
               <ThemedText type="subtitle" style={{ color: '#00E676', fontSize: 20, marginVertical: 2 }}>
                 68
               </ThemedText>
@@ -113,7 +121,7 @@ export default function IntelligenceScreen() {
             <ThemedText type="smallBold" style={{ opacity: 0.7 }}>LIVE MARKET INTELLIGENCE FEED</ThemedText>
           </View>
 
-          {/* Filter Chips - Scrollable to prevent horizontal overflow */}
+          {/* Filter Chips */}
           <View style={styles.filterRowWrapper}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
               {(['ALL', 'BTC', 'ETH', 'NVDA'] as const).map(asset => (
@@ -130,24 +138,29 @@ export default function IntelligenceScreen() {
             </ScrollView>
           </View>
 
+          {/* Non-virtualized Bounded News Feed List (Max 20 Items - Bug 6 Fix) */}
           <ThemedView type="backgroundElement" style={styles.newsCard}>
-            <View style={styles.newsItem}>
-              <View style={styles.newsMeta}>
-                <View style={styles.breakingTag}>
-                  <ThemedText type="smallBold" style={{ color: '#FFF', fontSize: 9 }}>LIVE</ThemedText>
+            {newsFeedItems.map(item => (
+              <View key={item.id} style={styles.newsItem}>
+                <View style={styles.newsMeta}>
+                  <View style={styles.breakingTag}>
+                    <ThemedText type="smallBold" style={{ color: '#FFF', fontSize: 9 }}>LIVE</ThemedText>
+                  </View>
+                  <ThemedText type="smallBold" style={{ color: '#00E676', fontSize: 11 }}>
+                    {item.tone}
+                  </ThemedText>
+                  <ThemedText type="small" style={{ opacity: 0.5, fontSize: 11 }}>
+                    {item.asset} • Market Stream
+                  </ThemedText>
                 </View>
-                <ThemedText type="smallBold" style={{ color: '#00E676', fontSize: 11 }}>
-                  BULLISH
-                </ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.5, fontSize: 11 }}>
-                  BTC • Market Stream
-                </ThemedText>
-              </View>
 
-              <ThemedText type="default" style={styles.headlineText}>
-                Alpaca Paper Trading Account Ready. Signal Engine monitoring 15m and 1h bars for entry triggers.
-              </ThemedText>
-            </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <ThemedText type="default" style={styles.headlineText} numberOfLines={2}>
+                    {item.text}
+                  </ThemedText>
+                </View>
+              </View>
+            ))}
           </ThemedView>
 
         </ScrollView>
@@ -194,7 +207,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   regimeDot: {
     width: 12,
@@ -210,7 +224,7 @@ const styles = StyleSheet.create({
   },
   regimeStatCol: {
     flex: 1,
-    flexShrink: 1,
+    minWidth: 0,
   },
   gridRow: {
     flexDirection: 'row',
@@ -252,7 +266,9 @@ const styles = StyleSheet.create({
     borderColor: '#2D3035',
   },
   newsItem: {
-    paddingVertical: 4,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#21262D',
   },
   newsMeta: {
     flexDirection: 'row',
