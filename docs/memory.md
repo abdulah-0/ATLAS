@@ -65,23 +65,30 @@ This document serves as the persistent memory layer for the development of **ATL
 - [x] Configurable Settings Controls (`ConversionRatioSlider.tsx`, `BtcGoalEditor.tsx`, `RiskLimitsEditor.tsx`).
 - [x] OpenRouter & BTC Conversion Integration (`openrouter.ts`, `btcConversion.ts`, `settings.tsx`, `index.tsx`).
 
-### ✅ ATLAS × Kronos Integration & Real-Time Event System
-*Kronos deep-learning time-series forecasting, 4-stage Bull/Bear/Risk Opus decision debate, central logger, real-time Event Logs Screen, icon-only 6-tab navbar, and Intel screen fixes.*
-- [x] Kronos TypeScript types (`kronos.ts`) & HTTP client service (`kronosClient.ts` with 15s timeout & keep-alive).
-- [x] Kronos Accuracy Tracker (`kronosAccuracyTracker.ts` updating `was_correct` on trade close).
+### ✅ ATLAS × Kronos Integration v1 & Real-Time Event System
+- [x] Kronos TypeScript types (`kronos.ts`) & HTTP client service (`kronosClient.ts`).
+- [x] Kronos Accuracy Tracker (`kronosAccuracyTracker.ts`).
 - [x] Centralized Logger service (`logger.ts`) & Zustand event store (`logsStore.ts`).
-- [x] Database schemas: `kronos_forecasts`, `ohlcv_cache` with trim trigger, `kronos_accuracy` view, and `log_events` with trim trigger in `db.ts`.
-- [x] 4-Stage Bull/Bear/Risk Opus Debate in `decisionEngine.ts` parsing `bull_case`, `bear_case`, `risk_flags`, `kronos_alignment`.
-- [x] Icon-Only 6-Tab Bottom Navigation Bar in `_layout.tsx` (`Control`, `Bot Arena`, `Logs`, `Intel`, `BTC Stack`, `Settings`) with `lucide-react-native` icons, active top bar, and red unread dot.
-- [x] Real-time Event Logs Screen (`logs.tsx`) with category/level filter chips, expandable debate details, auto-expanded errors, and mark-read on focus.
-- [x] Trade Feed Kronos Badge (`KronosAlignmentBadge.tsx`) & Intelligence Screen Forecast Panel (`KronosForecastPanel.tsx`) with non-virtualized 20-item news feed.
+- [x] Database schemas: `kronos_forecasts`, `ohlcv_cache`, `kronos_accuracy` view, `log_events`.
+- [x] 4-Stage Bull/Bear/Risk Opus Debate in `decisionEngine.ts`.
+- [x] Icon-Only 6-Tab Bottom Navigation Bar in `_layout.tsx`.
+- [x] Real-time Event Logs Screen (`logs.tsx`).
+- [x] Trade Feed Kronos Badge (`KronosAlignmentBadge.tsx`) & Intel Screen Forecast Panel (`KronosForecastPanel.tsx`).
+
+### ✅ ATLAS × Kronos Integration v2: Live Model Catalog, Rate Limiter & Security Audit
+*Live OpenRouter model catalog, token bucket rate limiter, daily cost caps, circuit breakers, and 7-phase security audit.*
+- [x] Live OpenRouter Model Catalog (`modelCatalog.ts`, `modelCatalogSeed.ts`, updated `ModelPickerSheet.tsx`).
+- [x] Exponential backoff with random jitter (`backoff.ts`).
+- [x] App-Wide Token Bucket RateLimiter with daily cost caps ($8/day cap) & 60s circuit breakers (`rateLimiter.ts`).
+- [x] Wrapped `kronosClient.ts`, `openrouter.ts`, `pinecone.ts`, and `alpaca.ts` in `rateLimiter.execute()`.
+- [x] Completed 7-Phase Security Review Audit (`docs/SECURITY_REVIEW_REPORT.md`).
 
 ---
 
 ## Development Log & Version History
 
-### [2026-08-01] ATLAS × Kronos Integration Complete
-- **Action:** Executed full integration plan per `docs/ATLAS_Kronos_Integration_Plan (1).md`.
-- **Validation:** Executed test suite (`test-kronos-v1.1.ts`). TypeScript compilation clean (`npx tsc --noEmit` 0 errors).
+### [2026-08-05] ATLAS × Kronos Integration v2 Complete
+- **Action:** Executed full integration plan per `docs/ATLAS_Kronos_Integration_Plan_v2.md`.
+- **Validation:** Executed test suite (`test-v2.ts`). TypeScript compilation clean (`npx tsc --noEmit` 0 errors).
 - **Git Commit:** Pushed codebase to `https://github.com/abdulah-0/ATLAS.git`.
-- **Status:** Kronos integration complete.
+- **Status:** v2 complete.

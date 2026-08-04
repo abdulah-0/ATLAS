@@ -1,4 +1,5 @@
 import { secureStore, SECURE_KEYS } from './secureStore';
+import { rateLimiter } from './rateLimiter';
 
 export interface PineconeMetadata {
   trade_id: string;
@@ -13,7 +14,7 @@ export interface PineconeMetadata {
   pnl_pct: number;
   bot_status: 'active' | 'terminated';
   timestamp: string;
-  embedding_text: string; // The semantic trade fingerprint text
+  embedding_text: string;
   what_worked?: string | null;
   what_failed?: string | null;
 }
@@ -32,7 +33,6 @@ export const getPineconeConfig = async () => {
     throw new Error('Pinecone API Key or Index Host is not configured. Please set them in Settings.');
   }
 
-  // Ensure host does not have trailing slash and starts with https://
   let formattedHost = host.trim();
   if (!formattedHost.startsWith('http://') && !formattedHost.startsWith('https://')) {
     formattedHost = `https://${formattedHost}`;
@@ -50,44 +50,39 @@ export const getPineconeConfig = async () => {
 export const pinecone = {
   namespace: 'atlas-trade-memory',
 
-  /**
-   * Upsert a vector embedding representing a trade outcome to Pinecone
-   * @param id Unique trade id
-   * @param values The 1536 dimension vector
-   * @param metadata Structured trade details
-   */
   async upsertVector(id: string, values: number[], metadata: PineconeMetadata): Promise<void> {
-    const { apiKey, host } = await getPineconeConfig();
+    return rateLimiter.execute('pinecone', async () => {
+      const { apiKey, host } = await getPineconeConfig();
 
-    const body = {
-      vectors: [
-        {
-          id,
-          values,
-          metadata,
+      const body = {
+        vectors: [
+          {
+            id,
+            values,
+            metadata,
+          },
+        ],
+        namespace: this.namespace,
+      };
+
+      const response = await fetch(`${host}/vectors/upsert`, {
+        method: 'POST',
+        headers: {
+          'Api-Key': apiKey,
+          'Content-Type': 'application/json',
         },
-      ],
-      namespace: this.namespace,
-    };
+        body: JSON.stringify(body),
+      });
 
-    const response = await fetch(`${host}/vectors/upsert`, {
-      method: 'POST',
-      headers: {
-        'Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Pinecone Upsert Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Pinecone Upsert Failed: ${response.status} - ${errorText}`);
-    }
   },
 
-  /**
-   * Queries Pinecone for top K most similar past trades based on a query vector
-   */
   async querySimilarity(
     queryVector: number[],
     filters: {
@@ -98,39 +93,42 @@ export const pinecone = {
     } = {},
     topK: number = 10
   ): Promise<PineconeMatch[]> {
-    const { apiKey, host } = await getPineconeConfig();
+    return rateLimiter.execute('pinecone', async () => {
+      const { apiKey, host } = await getPineconeConfig();
 
-    // Construct metadata filters
-    const filterObject: Record<string, any> = {};
-    if (filters.asset) filterObject.asset = { '$eq': filters.asset };
-    if (filters.direction) filterObject.direction = { '$eq': filters.direction };
-    if (filters.outcome) filterObject.outcome = { '$eq': filters.outcome };
-    if (filters.regime) filterObject.regime = { '$eq': filters.regime };
+      const filterObject: Record<string, any> = {};
+      if (filters.asset) filterObject.asset = { '$eq': filters.asset };
+      if (filters.direction) filterObject.direction = { '$eq': filters.direction };
+      if (filters.outcome) filterObject.outcome = { '$eq': filters.outcome };
+      if (filters.regime) filterObject.regime = { '$eq': filters.regime };
 
-    const body = {
-      vector: queryVector,
-      topK,
-      includeMetadata: true,
-      includeValues: false,
-      namespace: this.namespace,
-      ...(Object.keys(filterObject).length > 0 ? { filter: filterObject } : {}),
-    };
+      const body = {
+        vector: queryVector,
+        topK,
+        includeMetadata: true,
+        includeValues: false,
+        namespace: this.namespace,
+        ...(Object.keys(filterObject).length > 0 ? { filter: filterObject } : {}),
+      };
 
-    const response = await fetch(`${host}/query`, {
-      method: 'POST',
-      headers: {
-        'Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      const response = await fetch(`${host}/query`, {
+        method: 'POST',
+        headers: {
+          'Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Pinecone Query Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      const result = await response.json();
+      return result.matches || [];
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Pinecone Query Failed: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    return result.matches || [];
   }
 };

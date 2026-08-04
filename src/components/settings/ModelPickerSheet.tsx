@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { Modal, View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Modal, View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { LLMTaskKey } from '../../types/settings';
-import { AVAILABLE_MODELS, AvailableModel, useSettingsStore } from '../../store/settingsStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { fetchModelCatalog, CatalogModel } from '../../services/modelCatalog';
 import { Text } from '../typography/Text';
 import { Card } from '../layout/Card';
 import { Row } from '../layout/Row';
 import { Stack } from '../layout/Stack';
-import { truncateModelId } from '../../utils/responsive';
 
 interface ModelPickerSheetProps {
   visible: boolean;
@@ -23,66 +23,49 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
 }) => {
   const { settings } = useSettingsStore();
   const currentAssignment = taskKey ? settings.models[taskKey] : null;
+
+  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [providerFilter, setProviderFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    if (visible) {
+      loadCatalog();
+    }
+  }, [visible]);
+
+  const loadCatalog = async () => {
+    const data = await fetchModelCatalog();
+    setCatalog(data);
+  };
 
   if (!visible || !taskKey || !currentAssignment) return null;
 
   const activeId = selectedModelId || currentAssignment.modelId;
-  const selectedModel = AVAILABLE_MODELS.find(m => m.id === activeId);
+  const selectedModel = catalog.find(m => m.id === activeId);
 
-  const isDowngrade =
-    currentAssignment.tier === 'premium' &&
-    selectedModel &&
-    selectedModel.tier !== 'premium';
+  const providers = ['ALL', 'anthropic', 'openai', 'google', 'deepseek', 'x-ai', 'meta-llama', 'qwen'];
+
+  const filteredCatalog = catalog.filter(m => {
+    if (providerFilter !== 'ALL' && m.provider !== providerFilter) return false;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      return m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const isStructuredRequired = taskKey === 'tradeDecision' || taskKey === 'genomeGeneration' || taskKey === 'weeklyReview';
+  const lacksStructuredOutput = selectedModel && isStructuredRequired && !selectedModel.supports_structured_outputs;
 
   const handleConfirm = () => {
     if (activeId && taskKey) {
       onSelect(taskKey, activeId);
     }
     setSelectedModelId(null);
+    setSearchQuery('');
     onClose();
-  };
-
-  const renderTierGroup = (tier: 'premium' | 'mid' | 'cheap' | 'free', label: string) => {
-    const tierModels = AVAILABLE_MODELS.filter(m => m.tier === tier);
-    if (tierModels.length === 0) return null;
-
-    return (
-      <Stack gap={6} key={tier} style={{ marginBottom: 12 }}>
-        <Text variant="label" color={tier === 'premium' ? 'gold' : tier === 'free' ? 'green' : 'secondary'}>
-          {label}
-        </Text>
-        {tierModels.map(m => {
-          const isSelected = activeId === m.id;
-          return (
-            <TouchableOpacity key={m.id} onPress={() => setSelectedModelId(m.id)}>
-              <Card
-                variant={isSelected ? 'gold' : 'default'}
-                style={{
-                  backgroundColor: isSelected ? '#262010' : '#161B22',
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                }}
-              >
-                <Row justify="space-between">
-                  <Stack gap={2} style={{ flex: 1, paddingRight: 8 }}>
-                    <Text variant="bodySmall" color={isSelected ? 'gold' : 'white'} numberOfLines={1}>
-                      {m.label}
-                    </Text>
-                    <Text variant="caption" color="muted" numberOfLines={1}>
-                      {truncateModelId(m.id, 28)}
-                    </Text>
-                  </Stack>
-                  <Text variant="mono" color={m.cost === 0 ? 'green' : 'gold'}>
-                    {m.cost === 0 ? 'FREE' : `$${m.cost.toFixed(3)}/call`}
-                  </Text>
-                </Row>
-              </Card>
-            </TouchableOpacity>
-          );
-        })}
-      </Stack>
-    );
   };
 
   return (
@@ -91,26 +74,100 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
         <View style={styles.sheetContainer}>
           <View style={styles.dragHandle} />
 
-          <Stack gap={4} style={{ marginBottom: 12 }}>
+          <Stack gap={4} style={{ marginBottom: 8 }}>
             <Text variant="h2" color="white" numberOfLines={1}>
               {currentAssignment.label}
             </Text>
-            <Text variant="bodySmall" color="secondary" numberOfLines={2}>
+            <Text variant="caption" color="secondary" numberOfLines={2}>
               {currentAssignment.description}
             </Text>
           </Stack>
 
-          <ScrollView style={styles.modelList} showsVerticalScrollIndicator={false}>
-            {renderTierGroup('premium', 'PREMIUM TIER (RECOMMENDED FOR REASONING)')}
-            {renderTierGroup('mid', 'MID-TIER (BALANCED)')}
-            {renderTierGroup('cheap', 'CHEAP TIER (FAST & LIGHT)')}
-            {renderTierGroup('free', 'FREE TIER (OPEN ACCESS)')}
+          {/* Search Bar */}
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search live models (e.g. gpt-4o, claude, deepseek)..."
+            placeholderTextColor="#666"
+          />
+
+          {/* Provider Filter Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+            <Row gap={6}>
+              {providers.map(p => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.providerChip, providerFilter === p && styles.providerChipActive]}
+                  onPress={() => setProviderFilter(p)}
+                >
+                  <Text variant="caption" color={providerFilter === p ? 'white' : 'secondary'} style={{ fontSize: 10, fontWeight: 'bold' }}>
+                    {p.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Row>
           </ScrollView>
 
-          {isDowngrade && (
-            <Card variant="danger" style={{ marginVertical: 8, padding: 8 }}>
+          {/* Model Catalog List */}
+          <ScrollView style={styles.modelList} showsVerticalScrollIndicator={false}>
+            {filteredCatalog.length === 0 ? (
+              <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', padding: 20 }}>
+                No catalog models match search criteria.
+              </Text>
+            ) : (
+              filteredCatalog.map(m => {
+                const isSelected = activeId === m.id;
+                const costVal = parseFloat(m.pricing.prompt) * 1_000_000;
+
+                return (
+                  <TouchableOpacity key={m.id} onPress={() => setSelectedModelId(m.id)} style={{ marginBottom: 6 }}>
+                    <Card
+                      variant={isSelected ? 'gold' : 'default'}
+                      style={{
+                        backgroundColor: isSelected ? '#262010' : '#161B22',
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                      }}
+                    >
+                      <Row justify="space-between" align="center">
+                        <Stack gap={2} style={{ flex: 1, paddingRight: 8 }}>
+                          <Row gap={6} align="center">
+                            <Text variant="bodySmall" color={isSelected ? 'gold' : 'white'} numberOfLines={1} style={{ fontWeight: 'bold' }}>
+                              {m.name}
+                            </Text>
+                            {m.supports_structured_outputs && (
+                              <View style={styles.badgeJson}>
+                                <Text variant="caption" style={{ color: '#00E676', fontSize: 8 }}>JSON</Text>
+                              </View>
+                            )}
+                          </Row>
+                          <Text variant="caption" color="muted" numberOfLines={1}>
+                            {m.id} • {(m.context_length / 1000).toFixed(0)}k ctx
+                          </Text>
+                        </Stack>
+
+                        <Stack align="flex-end" gap={2}>
+                          <Text variant="mono" style={{ fontSize: 11 }} color={costVal === 0 ? 'green' : 'gold'}>
+                            {costVal === 0 ? 'FREE' : `$${costVal.toFixed(2)}/M`}
+                          </Text>
+                          <Text variant="caption" color="muted" style={{ fontSize: 9 }}>
+                            {m.tier}
+                          </Text>
+                        </Stack>
+                      </Row>
+                    </Card>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+
+          {/* Structured Output Warning */}
+          {lacksStructuredOutput && (
+            <Card variant="danger" style={{ marginVertical: 6, padding: 6 }}>
               <Text variant="caption" color="red">
-                ⚠️ Warning: {currentAssignment.warning || 'Downgrading from Premium may lower reasoning accuracy on this task.'}
+                ⚠️ Caution: Selected model may lack native structured JSON output support. Structured parser fallbacks will be enforced.
               </Text>
             </Card>
           )}
@@ -124,7 +181,7 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
 
             <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
               <Text variant="bodySmall" color="white" style={{ fontWeight: 'bold' }}>
-                Confirm Model
+                Select Model
               </Text>
             </TouchableOpacity>
           </Row>
@@ -145,7 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#161719',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#30363D',
   },
@@ -155,20 +212,46 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#484F58',
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  searchInput: {
+    backgroundColor: '#21262D',
+    borderRadius: 8,
+    padding: 8,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    fontSize: 12,
+  },
+  providerChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#21262D',
+  },
+  providerChipActive: {
+    backgroundColor: '#FF9900',
+  },
+  badgeJson: {
+    backgroundColor: '#102A18',
+    borderColor: '#00E676',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
   modelList: {
-    maxHeight: 380,
+    maxHeight: 340,
   },
   cancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 8,
     backgroundColor: '#21262D',
   },
   confirmBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 8,
     backgroundColor: '#D29922',
   },

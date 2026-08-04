@@ -1,9 +1,9 @@
 import { secureStore, SECURE_KEYS } from './secureStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { LLMTaskKey } from '../types/settings';
+import { rateLimiter } from './rateLimiter';
 
 export const OPENROUTER_MODELS = {
-  // Static defaults fallback
   OPUS: 'anthropic/claude-opus-4-6',
   SONNET: 'anthropic/claude-sonnet-4-6',
   HAIKU: 'anthropic/claude-haiku-4-5-20251001',
@@ -47,9 +47,6 @@ export const openrouter = {
     };
   },
 
-  /**
-   * Retrieves the configured model ID for a specific task from settings store
-   */
   getModelForTask(taskKey: LLMTaskKey): string {
     try {
       const { settings } = useSettingsStore.getState();
@@ -72,62 +69,81 @@ export const openrouter = {
       response_format?: { type: 'json_object' };
     } = {}
   ): Promise<string> {
-    const headers = await this.getHeaders();
-    const body = {
-      model,
-      messages,
-      temperature: options.temperature ?? 0.2,
-      max_tokens: options.max_tokens,
-      response_format: options.response_format,
-    };
+    const isFree = model.endsWith(':free');
+    const serviceBucket = isFree ? 'openrouter_free' : 'openrouter_premium';
+    const estimatedCost = isFree ? 0 : 0.05; // estimated ~$0.05 / call
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    return rateLimiter.execute(
+      serviceBucket,
+      async () => {
+        const headers = await this.getHeaders();
+        const body = {
+          model,
+          messages,
+          temperature: options.temperature ?? 0.2,
+          max_tokens: options.max_tokens,
+          response_format: options.response_format,
+        };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter Call Failed: ${response.status} - ${errorText}`);
-    }
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
 
-    const data: ChatCompletionResponse = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (content === undefined) {
-      throw new Error('OpenRouter returned an empty response');
-    }
+        if (!response.ok) {
+          const errorText = await response.text();
+          const err: any = new Error(`OpenRouter Call Failed: ${response.status} - ${errorText}`);
+          err.status = response.status;
+          throw err;
+        }
 
-    return content;
+        const data: ChatCompletionResponse = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        
+        if (content === undefined) {
+          throw new Error('OpenRouter returned an empty response');
+        }
+
+        return content;
+      },
+      estimatedCost
+    );
   },
 
   async getEmbedding(text: string): Promise<number[]> {
-    const headers = await this.getHeaders();
-    
-    const body = {
-      model: OPENROUTER_MODELS.EMBEDDING,
-      input: text,
-    };
+    return rateLimiter.execute(
+      'openrouter_cheap',
+      async () => {
+        const headers = await this.getHeaders();
+        const body = {
+          model: OPENROUTER_MODELS.EMBEDDING,
+          input: text,
+        };
 
-    const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+        const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Embedding Generation Failed: ${response.status} - ${errorText}`);
-    }
+        if (!response.ok) {
+          const errorText = await response.text();
+          const err: any = new Error(`Embedding Generation Failed: ${response.status} - ${errorText}`);
+          err.status = response.status;
+          throw err;
+        }
 
-    const result = await response.json();
-    const embedding = result.data?.[0]?.embedding;
-    
-    if (!embedding) {
-      throw new Error('No embedding returned from API');
-    }
+        const result = await response.json();
+        const embedding = result.data?.[0]?.embedding;
+        
+        if (!embedding) {
+          throw new Error('No embedding returned from API');
+        }
 
-    return embedding;
+        return embedding;
+      },
+      0.0001
+    );
   }
 };

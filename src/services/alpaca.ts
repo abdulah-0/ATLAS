@@ -1,4 +1,5 @@
 import { secureStore, SECURE_KEYS } from './secureStore';
+import { rateLimiter } from './rateLimiter';
 
 export interface AlpacaAccount {
   id: string;
@@ -39,7 +40,7 @@ export interface AlpacaPosition {
 export interface AlpacaOrderRequest {
   symbol: string;
   qty?: string;
-  notional?: string; // For fractional shares
+  notional?: string;
   side: 'buy' | 'sell';
   type: 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing_stop';
   time_in_force: 'day' | 'gtc' | 'opg' | 'cls' | 'ioc' | 'fok';
@@ -76,15 +77,14 @@ export interface AlpacaOrder {
 }
 
 export interface MarketBar {
-  t: string; // Timestamp
-  o: number; // Open
-  h: number; // High
-  l: number; // Low
-  c: number; // Close
-  v: number; // Volume
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
 }
 
-// Config Helper
 export const getAlpacaHeaders = async () => {
   const apiKey = await secureStore.getItem(SECURE_KEYS.ALPACA_API_KEY);
   const secretKey = await secureStore.getItem(SECURE_KEYS.ALPACA_SECRET_KEY);
@@ -102,8 +102,7 @@ export const getAlpacaHeaders = async () => {
 };
 
 export const alpaca = {
-  // Config state
-  isLive: false, // Default to Paper Trading for safety
+  isLive: false,
 
   setMode(isLive: boolean): void {
     this.isLive = isLive;
@@ -116,166 +115,175 @@ export const alpaca = {
   },
 
   getDataUrl(): string {
-    // Data endpoint is unified but handles auth differently based on live/paper
     return 'https://data.alpaca.markets';
   },
 
   async getAccount(): Promise<AlpacaAccount> {
-    const baseUrl = this.getBaseUrl();
-    const headers = await getAlpacaHeaders();
-    
-    const response = await fetch(`${baseUrl}/v2/account`, {
-      method: 'GET',
-      headers,
+    return rateLimiter.execute('alpaca_trading', async () => {
+      const baseUrl = this.getBaseUrl();
+      const headers = await getAlpacaHeaders();
+      
+      const response = await fetch(`${baseUrl}/v2/account`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Account Fetch Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Account Fetch Failed: ${response.status} - ${errorText}`);
-    }
-
-    return response.json();
   },
 
   async getPositions(): Promise<AlpacaPosition[]> {
-    const baseUrl = this.getBaseUrl();
-    const headers = await getAlpacaHeaders();
+    return rateLimiter.execute('alpaca_trading', async () => {
+      const baseUrl = this.getBaseUrl();
+      const headers = await getAlpacaHeaders();
 
-    const response = await fetch(`${baseUrl}/v2/positions`, {
-      method: 'GET',
-      headers,
+      const response = await fetch(`${baseUrl}/v2/positions`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Positions Fetch Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Positions Fetch Failed: ${response.status} - ${errorText}`);
-    }
-
-    return response.json();
   },
 
   async placeOrder(order: AlpacaOrderRequest): Promise<AlpacaOrder> {
-    const baseUrl = this.getBaseUrl();
-    const headers = await getAlpacaHeaders();
+    return rateLimiter.execute('alpaca_trading', async () => {
+      const baseUrl = this.getBaseUrl();
+      const headers = await getAlpacaHeaders();
 
-    const response = await fetch(`${baseUrl}/v2/orders`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(order),
+      const response = await fetch(`${baseUrl}/v2/orders`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(order),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Order Placement Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Order Placement Failed: ${response.status} - ${errorText}`);
-    }
-
-    return response.json();
   },
 
   async cancelOrder(orderId: string): Promise<void> {
-    const baseUrl = this.getBaseUrl();
-    const headers = await getAlpacaHeaders();
+    return rateLimiter.execute('alpaca_trading', async () => {
+      const baseUrl = this.getBaseUrl();
+      const headers = await getAlpacaHeaders();
 
-    const response = await fetch(`${baseUrl}/v2/orders/${orderId}`, {
-      method: 'DELETE',
-      headers,
+      const response = await fetch(`${baseUrl}/v2/orders/${orderId}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Order Cancelation Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Order Cancelation Failed: ${response.status} - ${errorText}`);
-    }
   },
 
   async getAsset(symbol: string): Promise<any> {
-    const baseUrl = this.getBaseUrl();
-    const headers = await getAlpacaHeaders();
+    return rateLimiter.execute('alpaca_trading', async () => {
+      const baseUrl = this.getBaseUrl();
+      const headers = await getAlpacaHeaders();
 
-    const response = await fetch(`${baseUrl}/v2/assets/${symbol}`, {
-      method: 'GET',
-      headers,
+      const response = await fetch(`${baseUrl}/v2/assets/${symbol}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Asset Fetch Failed for ${symbol}: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Asset Fetch Failed for ${symbol}: ${response.status} - ${errorText}`);
-    }
-
-    return response.json();
   },
 
-  /**
-   * Fetches historical bars for stock or crypto
-   * @param symbol Asset symbol (e.g. "BTC/USD" or "NVDA")
-   * @param assetClass 'crypto' or 'stock'
-   * @param timeframe '1Min' | '5Min' | '15Min' | '1Hour' | '1Day'
-   * @param limit Number of bars (max 1000)
-   */
   async getBars(
     symbol: string,
     assetClass: 'crypto' | 'stock',
     timeframe: '1Min' | '5Min' | '15Min' | '1Hour' | '1Day' = '1Hour',
     limit: number = 100
   ): Promise<MarketBar[]> {
-    const dataUrl = this.getDataUrl();
-    const headers = await getAlpacaHeaders();
+    return rateLimiter.execute('alpaca_data', async () => {
+      const dataUrl = this.getDataUrl();
+      const headers = await getAlpacaHeaders();
 
-    let endpoint = '';
-    let params = `timeframe=${timeframe}&limit=${limit}`;
+      let endpoint = '';
+      let params = `timeframe=${timeframe}&limit=${limit}`;
 
-    if (assetClass === 'crypto') {
-      // E.g., https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=BTC/USD&timeframe=1Hour&limit=100
-      endpoint = `${dataUrl}/v1beta3/crypto/us/bars`;
-      params += `&symbols=${encodeURIComponent(symbol)}`;
-    } else {
-      // E.g., https://data.alpaca.markets/v2/stocks/bars?symbols=NVDA&timeframe=1Hour&limit=100
-      endpoint = `${dataUrl}/v2/stocks/bars`;
-      params += `&symbols=${encodeURIComponent(symbol)}`;
-    }
+      if (assetClass === 'crypto') {
+        endpoint = `${dataUrl}/v1beta3/crypto/us/bars`;
+        params += `&symbols=${encodeURIComponent(symbol)}`;
+      } else {
+        endpoint = `${dataUrl}/v2/stocks/bars`;
+        params += `&symbols=${encodeURIComponent(symbol)}`;
+      }
 
-    const response = await fetch(`${endpoint}?${params}`, {
-      method: 'GET',
-      headers,
+      const response = await fetch(`${endpoint}?${params}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca Bars Fetch Failed for ${symbol}: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      const result = await response.json();
+      return result.bars?.[symbol] || [];
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Bars Fetch Failed for ${symbol}: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    
-    // Alpaca returns bars grouped by symbol key
-    if (assetClass === 'crypto') {
-      return result.bars?.[symbol] || [];
-    } else {
-      return result.bars?.[symbol] || [];
-    }
   },
 
-  /**
-   * Fetches financial news for symbol
-   */
   async getNews(symbols?: string[], limit: number = 10): Promise<any[]> {
-    const dataUrl = this.getDataUrl();
-    const headers = await getAlpacaHeaders();
-    
-    let url = `${dataUrl}/v1beta1/news?limit=${limit}`;
-    if (symbols && symbols.length > 0) {
-      url += `&symbols=${encodeURIComponent(symbols.join(','))}`;
-    }
+    return rateLimiter.execute('news_alpaca', async () => {
+      const dataUrl = this.getDataUrl();
+      const headers = await getAlpacaHeaders();
+      
+      let url = `${dataUrl}/v1beta1/news?limit=${limit}`;
+      if (symbols && symbols.length > 0) {
+        url += `&symbols=${encodeURIComponent(symbols.join(','))}`;
+      }
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Alpaca News Fetch Failed: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        throw err;
+      }
+
+      const result = await response.json();
+      return result.news || [];
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca News Fetch Failed: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    return result.news || [];
   }
 };
