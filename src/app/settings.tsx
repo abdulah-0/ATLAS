@@ -29,6 +29,8 @@ export default function SettingsScreen() {
   const [alpacaSecretKey, setAlpacaSecretKey] = useState('');
   const [pineconeKey, setPineconeKey] = useState('');
   const [pineconeHost, setPineconeHost] = useState('');
+  const [kronosUrl, setKronosUrl] = useState('');
+  const [kronosKey, setKronosKey] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
 
@@ -51,6 +53,15 @@ export default function SettingsScreen() {
 
       const pinKey = await secureStore.getItem(SECURE_KEYS.PINECONE_API_KEY);
       if (pinKey) setPineconeKey(pinKey);
+
+      const pinHost = await secureStore.getItem(SECURE_KEYS.PINECONE_INDEX_HOST);
+      if (pinHost) setPineconeHost(pinHost);
+
+      const kroUrl = await secureStore.getItem(SECURE_KEYS.KRONOS_SERVICE_URL);
+      if (kroUrl) setKronosUrl(kroUrl);
+
+      const kroKey = await secureStore.getItem(SECURE_KEYS.KRONOS_API_KEY);
+      if (kroKey) setKronosKey(kroKey);
     } catch (e) {
       console.log('Key load error:', e);
     }
@@ -62,6 +73,9 @@ export default function SettingsScreen() {
       if (alpacaApiKey) await secureStore.setItem(SECURE_KEYS.ALPACA_API_KEY, alpacaApiKey);
       if (alpacaSecretKey) await secureStore.setItem(SECURE_KEYS.ALPACA_SECRET_KEY, alpacaSecretKey);
       if (pineconeKey) await secureStore.setItem(SECURE_KEYS.PINECONE_API_KEY, pineconeKey);
+      if (pineconeHost) await secureStore.setItem(SECURE_KEYS.PINECONE_INDEX_HOST, pineconeHost);
+      if (kronosUrl) await secureStore.setItem(SECURE_KEYS.KRONOS_SERVICE_URL, kronosUrl);
+      if (kronosKey) await secureStore.setItem(SECURE_KEYS.KRONOS_API_KEY, kronosKey);
 
       setSaveStatus('✅ Credentials Encrypted & Saved!');
       setTimeout(() => setSaveStatus(null), 4000);
@@ -308,6 +322,33 @@ export default function SettingsScreen() {
                 value={pineconeHost}
                 onChangeText={setPineconeHost}
                 placeholder="https://atlas-index-1234.pinecone.io"
+                placeholderTextColor="#666"
+              />
+            </Stack>
+
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="gold">
+                Kronos Service URL (Render Microservice)
+              </Text>
+              <TextInput
+                style={styles.textInput}
+                value={kronosUrl}
+                onChangeText={setKronosUrl}
+                placeholder="https://atlas-kronos-xxxx.onrender.com"
+                placeholderTextColor="#666"
+              />
+            </Stack>
+
+            <Stack gap={4}>
+              <Text variant="bodySmall" color="gold">
+                Kronos API Key (X-ATLAS-Key Header)
+              </Text>
+              <TextInput
+                style={styles.textInput}
+                value={kronosKey}
+                onChangeText={setKronosKey}
+                secureTextEntry
+                placeholder="Kronos secret key..."
                 placeholderTextColor="#666"
               />
             </Stack>

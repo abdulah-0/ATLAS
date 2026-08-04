@@ -5,7 +5,9 @@ export const SECURE_KEYS = {
   ALPACA_SECRET_KEY: 'atlas_alpaca_secret_key',
   OPENROUTER_API_KEY: 'atlas_openrouter_api_key',
   PINECONE_API_KEY: 'atlas_pinecone_api_key',
-  PINECONE_INDEX_HOST: 'atlas_pinecone_index_host', // E.g., https://index-name-xxxx.svc.us-east1-aws.pinecone.io
+  PINECONE_INDEX_HOST: 'atlas_pinecone_index_host',
+  KRONOS_API_KEY: 'atlas_kronos_api_key',
+  KRONOS_SERVICE_URL: 'atlas_kronos_service_url',
 };
 
 export const secureStore = {

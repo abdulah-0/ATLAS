@@ -8,13 +8,18 @@ const REQUEST_TIMEOUT_MS = 15000;
 
 export class KronosClient {
   private apiKey: string | null = null;
+  private serviceUrl: string = DEFAULT_KRONOS_URL;
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null;
 
   async init(): Promise<void> {
     try {
-      this.apiKey = await secureStore.getItem(SECURE_KEYS.PINECONE_API_KEY); // Using secureStore fallback or dedicated key
+      this.apiKey = await secureStore.getItem(SECURE_KEYS.KRONOS_API_KEY);
+      const customUrl = await secureStore.getItem(SECURE_KEYS.KRONOS_SERVICE_URL);
+      if (customUrl) {
+        this.serviceUrl = customUrl;
+      }
     } catch (e) {
-      console.log('Kronos client initialized without API key');
+      console.log('Kronos client initialized without custom API key/URL');
     }
   }
 
@@ -22,7 +27,7 @@ export class KronosClient {
     if (this.keepAliveInterval) return;
     this.keepAliveInterval = setInterval(async () => {
       try {
-        await fetch(`${DEFAULT_KRONOS_URL}/ping`, { method: 'GET' });
+        await fetch(`${this.serviceUrl}/ping`, { method: 'GET' });
       } catch (e) {
         // Best-effort ping
       }
@@ -37,12 +42,13 @@ export class KronosClient {
   }
 
   async forecast(req: ForecastRequest): Promise<KronosForecast | null> {
+    await this.init();
     const requestedAt = new Date().toISOString();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const resp = await fetch(`${DEFAULT_KRONOS_URL}/forecast`, {
+      const resp = await fetch(`${this.serviceUrl}/forecast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,11 +104,12 @@ export class KronosClient {
   }
 
   async forecastBatch(requests: ForecastRequest[]): Promise<Map<string, KronosForecast>> {
+    await this.init();
     const results = new Map<string, KronosForecast>();
     if (requests.length === 0) return results;
 
     try {
-      const resp = await fetch(`${DEFAULT_KRONOS_URL}/forecast/batch`, {
+      const resp = await fetch(`${this.serviceUrl}/forecast/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
