@@ -423,7 +423,7 @@ export default function SettingsScreen() {
         visible={Boolean(activeTaskForPicker)}
         taskKey={activeTaskForPicker}
         onClose={() => setActiveTaskForPicker(null)}
-        onSelect={(taskKey, modelId) => updateModelForTask(taskKey, modelId)}
+        onSelect={(taskKey, modelId, tier, estCostUsd) => updateModelForTask(taskKey, modelId, tier, estCostUsd)}
       />
     </Screen>
   );

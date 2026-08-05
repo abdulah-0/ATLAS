@@ -34,7 +34,7 @@ interface SettingsStore {
   settings: ATLASSettings;
 
   // Model selection actions
-  updateModelForTask: (taskKey: LLMTaskKey, modelId: string) => void;
+  updateModelForTask: (taskKey: LLMTaskKey, modelId: string, tier?: 'premium' | 'mid' | 'cheap' | 'free', estCostUsd?: number) => void;
   resetModelToDefault: (taskKey: LLMTaskKey) => void;
   resetAllModels: () => void;
 
@@ -64,9 +64,11 @@ export const useSettingsStore = create<SettingsStore>()(
         version: 1,
       },
 
-      updateModelForTask: (taskKey, modelId) => {
-        const model = AVAILABLE_MODELS.find(m => m.id === modelId);
-        if (!model) return;
+      updateModelForTask: (taskKey, modelId, tier, estCostUsd) => {
+        const seedModel = AVAILABLE_MODELS.find(m => m.id === modelId);
+        const resolvedTier = tier || seedModel?.tier || (modelId.includes('free') ? 'free' : modelId.includes('opus') || modelId.includes('gpt-4') ? 'premium' : 'mid');
+        const resolvedCost = estCostUsd ?? seedModel?.cost ?? (resolvedTier === 'premium' ? 0.05 : resolvedTier === 'mid' ? 0.01 : resolvedTier === 'cheap' ? 0.002 : 0);
+
         set(state => ({
           settings: {
             ...state.settings,
@@ -75,8 +77,8 @@ export const useSettingsStore = create<SettingsStore>()(
               [taskKey]: {
                 ...state.settings.models[taskKey],
                 modelId,
-                tier: model.tier,
-                estCostUsd: model.cost,
+                tier: resolvedTier,
+                estCostUsd: resolvedCost,
               },
             },
             updatedAt: new Date().toISOString(),

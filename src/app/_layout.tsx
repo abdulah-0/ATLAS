@@ -53,6 +53,11 @@ export default function RootLayout() {
           tabBarShowLabel: false, // Icon-only bottom navbar
           tabBarActiveTintColor: '#FF9900',
           tabBarInactiveTintColor: '#484F58',
+          tabBarItemStyle: {
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
           tabBarStyle: {
             backgroundColor: '#161719',
             borderTopColor: '#2D3035',
@@ -60,6 +65,8 @@ export default function RootLayout() {
             paddingBottom: bottomPadding,
             paddingTop: 4,
             elevation: 8,
+            flexDirection: 'row',
+            justifyContent: 'space-around',
           },
         }}
       >
@@ -135,10 +142,11 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    width: 44,
   },
   topIndicator: {
     position: 'absolute',

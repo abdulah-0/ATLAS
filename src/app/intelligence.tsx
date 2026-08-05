@@ -6,7 +6,11 @@ import { ThemedView } from '@/components/themed-view';
 import { regimeDetector, RegimeResult } from '../services/regime';
 import { KronosForecastPanel } from '../components/intelligence/KronosForecastPanel';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function IntelligenceScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top + 8, 20);
   const [assetFilter, setAssetFilter] = useState<'ALL' | 'BTC' | 'ETH' | 'NVDA'>('ALL');
   const [regime, setRegime] = useState<RegimeResult | null>(null);
 
@@ -44,7 +48,7 @@ export default function IntelligenceScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]} showsVerticalScrollIndicator={false}>
 
           {/* Header */}
           <View style={styles.header}>

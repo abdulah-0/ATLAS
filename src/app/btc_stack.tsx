@@ -6,7 +6,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { dbOperations } from '../services/db';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function BtcStackScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top + 8, 20);
   const [btcPrice] = useState(67420.00);
   const [totalBtc, setTotalBtc] = useState<number>(0);
   const [conversions, setConversions] = useState<any[]>([]);
@@ -33,7 +37,7 @@ export default function BtcStackScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]} showsVerticalScrollIndicator={false}>
 
           {/* Header */}
           <View style={styles.header}>

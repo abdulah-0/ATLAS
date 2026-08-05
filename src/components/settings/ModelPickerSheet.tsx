@@ -12,7 +12,7 @@ interface ModelPickerSheetProps {
   visible: boolean;
   taskKey: LLMTaskKey | null;
   onClose: () => void;
-  onSelect: (taskKey: LLMTaskKey, modelId: string) => void;
+  onSelect: (taskKey: LLMTaskKey, modelId: string, tier?: 'premium' | 'mid' | 'cheap' | 'free', estCostUsd?: number) => void;
 }
 
 export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
@@ -61,7 +61,10 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
 
   const handleConfirm = () => {
     if (activeId && taskKey) {
-      onSelect(taskKey, activeId);
+      const modelMeta = catalog.find(m => m.id === activeId);
+      const tier = modelMeta ? (modelMeta.tier.toLowerCase() as 'premium' | 'mid' | 'cheap' | 'free') : undefined;
+      const cost = modelMeta ? parseFloat(modelMeta.pricing.prompt) * 1_000_000 : undefined;
+      onSelect(taskKey, activeId, tier, cost);
     }
     setSelectedModelId(null);
     setSearchQuery('');

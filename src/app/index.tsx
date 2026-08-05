@@ -10,8 +10,12 @@ import { secureStore, SECURE_KEYS } from '../services/secureStore';
 import { dbOperations } from '../services/db';
 import { useSettingsStore } from '../store/settingsStore';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function MissionControlScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top + 8, 20);
   const targetBtcGoal = useSettingsStore(state => state.settings.goal.targetBtc);
 
   const [hasKeys, setHasKeys] = useState<boolean | null>(null);
@@ -72,7 +76,7 @@ export default function MissionControlScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]} showsVerticalScrollIndicator={false}>
 
           {/* Clean Prominent Header */}
           <View style={styles.headerBlock}>

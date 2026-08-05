@@ -8,7 +8,11 @@ import { BotGenome } from '../types/genome';
 import { SEED_GENOMES } from '../services/seedGenomes';
 import { dbOperations } from '../services/db';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function BotArenaScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top + 8, 20);
   const [expandedBotId, setExpandedBotId] = useState<string | null>(null);
   const [bots, setBots] = useState<BotGenome[]>(SEED_GENOMES);
 
@@ -30,7 +34,7 @@ export default function BotArenaScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]} showsVerticalScrollIndicator={false}>
 
           {/* Header */}
           <View style={styles.header}>

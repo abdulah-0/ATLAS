@@ -1,5 +1,6 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { ScrollView, View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsive } from '../../hooks/useResponsive';
 
 interface ScreenProps {
@@ -17,17 +18,19 @@ export const Screen: React.FC<ScreenProps> = ({
   testID,
   style,
 }) => {
+  const insets = useSafeAreaInsets();
   const r = useResponsive();
+  const topPadding = Math.max(insets.top, 20);
   const px = padded ? r.horizontalPadding : 0;
 
   const content = (
-    <View style={[{ paddingHorizontal: px, flex: scroll ? undefined : 1 }, style]}>
+    <View style={[{ paddingHorizontal: px, paddingTop: topPadding, flex: scroll ? undefined : 1 }, style]}>
       {children}
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.safe} testID={testID}>
+    <View style={styles.safe} testID={testID}>
       {scroll ? (
         <ScrollView
           style={styles.scroll}
@@ -40,7 +43,7 @@ export const Screen: React.FC<ScreenProps> = ({
       ) : (
         content
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

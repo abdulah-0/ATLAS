@@ -6,7 +6,11 @@ import { ThemedView } from '@/components/themed-view';
 import { dbOperations } from '../services/db';
 import { KronosAlignmentBadge } from '../components/trades/KronosAlignmentBadge';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function TradeFeedScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top + 4, 16);
   const [filter, setFilter] = useState<'all' | 'wins' | 'losses'>('all');
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [trades, setTrades] = useState<any[]>([]);
@@ -38,7 +42,7 @@ export default function TradeFeedScreen() {
       <SafeAreaView style={styles.safeArea}>
 
         {/* Filter Bar Header */}
-        <View style={styles.filterHeaderWrapper}>
+        <View style={[styles.filterHeaderWrapper, { paddingTop: topPadding }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterHeader}>
             <TouchableOpacity 
               style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
