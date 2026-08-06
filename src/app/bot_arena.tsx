@@ -12,10 +12,10 @@ export default function BotArenaScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top + 8, 20);
 
-  const isEngineRunning = useSettingsStore(state => state.settings.isEngineRunning ?? true);
+  const isEngineRunning = useSettingsStore(state => state.settings?.isEngineRunning ?? true);
   const toggleEngine = useSettingsStore(state => state.toggleEngine);
   const toggleBotPause = useSettingsStore(state => state.toggleBotPause);
-  const pausedBotIds = useSettingsStore(state => state.settings.pausedBotIds || []);
+  const pausedBotIds = useSettingsStore(state => state.settings?.pausedBotIds || []);
 
   const [expandedBotId, setExpandedBotId] = useState<string | null>(null);
   const [bots, setBots] = useState<BotGenome[]>(SEED_GENOMES);
@@ -28,12 +28,34 @@ export default function BotArenaScreen() {
     try {
       const dbBots = await dbOperations.getActiveBots();
       if (dbBots && dbBots.length > 0) {
-        setBots(dbBots.map(b => typeof b.genome === 'string' ? JSON.parse(b.genome) : b.genome || b));
+        const parsed: BotGenome[] = [];
+        for (const row of dbBots) {
+          try {
+            if (row.genome) {
+              const g = typeof row.genome === 'string' ? JSON.parse(row.genome) : row.genome;
+              if (g && g.bot_id) {
+                parsed.push(g);
+                continue;
+              }
+            }
+            if (row.bot_id) {
+              const seed = SEED_GENOMES.find(s => s.bot_id === row.bot_id);
+              if (seed) parsed.push(seed);
+            }
+          } catch (parseErr) {
+            console.warn('Error parsing bot genome row:', parseErr);
+          }
+        }
+        if (parsed.length > 0) {
+          setBots(parsed);
+        }
       }
     } catch (e) {
-      console.log('Using seed genomes for Bot Arena UI');
+      console.log('Using default seed genomes for Bot Arena UI');
     }
   };
+
+  const activeBotCount = Math.max(0, bots.length - (pausedBotIds?.length || 0));
 
   return (
     <ThemedView style={styles.container}>
@@ -57,7 +79,7 @@ export default function BotArenaScreen() {
                   </ThemedText>
                 </View>
                 <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2 }}>
-                  {isEngineRunning ? `${bots.length - pausedBotIds.length}/${bots.length} Bots Active` : 'All Trading Scanners Paused'}
+                  {isEngineRunning ? `${activeBotCount}/${bots.length} Bots Active` : 'All Trading Scanners Paused'}
                 </ThemedText>
               </View>
 
@@ -74,11 +96,15 @@ export default function BotArenaScreen() {
 
           {/* Active Bot Cards */}
           {bots.map((bot, index) => {
+            if (!bot || !bot.bot_id) return null;
+
             const isExpanded = expandedBotId === bot.bot_id;
             const healthScore = 85;
             const isChampion = index === 0;
             const primaryAsset = bot.asset_universe?.[0] || 'BTC/USD';
-            const isPaused = pausedBotIds.includes(bot.bot_id) || !isEngineRunning;
+            const isPaused = (pausedBotIds || []).includes(bot.bot_id) || !isEngineRunning;
+            const signalType = bot.entry?.primary_signal || 'momentum';
+            const timeframe = bot.preferred_timeframe || '15min';
 
             return (
               <TouchableOpacity
@@ -100,22 +126,19 @@ export default function BotArenaScreen() {
                           </View>
                         )}
                         <ThemedText type="small" style={{ opacity: 0.6 }}>
-                          Gen {bot.generation} • {primaryAsset}
+                          Gen {bot.generation ?? 1} • {primaryAsset}
                         </ThemedText>
                       </View>
 
                       <ThemedText type="subtitle" style={styles.botTitleText} numberOfLines={1}>
-                        {bot.nickname} ({bot.bot_id})
+                        {bot.nickname || bot.bot_id} ({bot.bot_id})
                       </ThemedText>
                     </View>
 
                     <View style={{ alignItems: 'flex-end', gap: 4, minWidth: 90 }}>
                       <TouchableOpacity
                         style={[styles.botActionBtn, { backgroundColor: isPaused ? '#102A18' : '#3D1E22', borderColor: isPaused ? '#00E676' : '#FF1744' }]}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          toggleBotPause(bot.bot_id);
-                        }}
+                        onPress={() => toggleBotPause(bot.bot_id)}
                       >
                         <ThemedText type="smallBold" style={{ color: isPaused ? '#00E676' : '#FF1744', fontSize: 10 }}>
                           {isPaused ? '▶️ START' : '⏸️ STOP'}
@@ -136,12 +159,12 @@ export default function BotArenaScreen() {
                   <View style={styles.metricsRow}>
                     <View style={styles.metricItem}>
                       <ThemedText type="small" style={{ opacity: 0.5 }}>TIMEFRAME</ThemedText>
-                      <ThemedText type="smallBold">{bot.preferred_timeframe || '15min'}</ThemedText>
+                      <ThemedText type="smallBold">{timeframe}</ThemedText>
                     </View>
 
                     <View style={styles.metricItem}>
                       <ThemedText type="small" style={{ opacity: 0.5 }}>SIGNAL TYPE</ThemedText>
-                      <ThemedText type="smallBold" numberOfLines={1}>{bot.entry?.primary_signal || 'momentum'}</ThemedText>
+                      <ThemedText type="smallBold" numberOfLines={1}>{signalType}</ThemedText>
                     </View>
 
                     <View style={styles.metricItem}>
@@ -158,10 +181,10 @@ export default function BotArenaScreen() {
                       <View style={styles.divider} />
                       <ThemedText type="smallBold" style={{ color: '#FF9900' }}>ENTRY RULES & CONFLUENCE</ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8, marginTop: 2 }}>
-                        • Primary Signal: {bot.entry?.primary_signal}
+                        • Primary Signal: {String(bot.entry?.primary_signal || 'N/A')}
                       </ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8 }}>
-                        • Min Signal Confidence: {bot.entry?.min_confidence}
+                        • Min Signal Confidence: {bot.entry?.min_confidence ?? 0.65}
                       </ThemedText>
 
                       <ThemedText type="smallBold" style={{ color: '#FF9900', marginTop: 8 }}>EXIT & RISK BOUNDARIES</ThemedText>
