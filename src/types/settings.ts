@@ -43,6 +43,8 @@ export interface ATLASSettings {
   models: Record<LLMTaskKey, ModelAssignment>;
   conversion: BTCConversionSettings;
   goal: TradingGoalSettings;
+  isEngineRunning: boolean; // Global master trading toggle
+  pausedBotIds: string[]; // List of individually paused bot IDs
   updatedAt: string;
   version: number;
 }

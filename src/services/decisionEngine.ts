@@ -9,6 +9,7 @@ import { RegimeType } from './regime';
 import { kronosClient } from './kronosClient';
 import { KronosForecast } from '../types/kronos';
 import { logger } from './logger';
+import { useSettingsStore } from '../store/settingsStore';
 
 export const DecisionSchema = z.object({
   bull_case: z.string().optional(),
@@ -43,6 +44,30 @@ export const decisionEngine = {
       similarPastTrades: [],
       kronos_alignment: 'UNAVAILABLE',
     };
+
+    const { isEngineRunning, pausedBotIds } = useSettingsStore.getState().settings;
+
+    if (isEngineRunning === false) {
+      logger.tradeRejected('N/A', bot.bot_id, signal.asset, 'Trading engine is paused by user');
+      return {
+        action: 'REJECT',
+        confidence: 0.0,
+        reasoning: 'Trading engine is paused by user',
+        similarPastTrades: [],
+        kronos_alignment: 'UNAVAILABLE',
+      };
+    }
+
+    if ((pausedBotIds || []).includes(bot.bot_id)) {
+      logger.tradeRejected('N/A', bot.bot_id, signal.asset, `Bot ${bot.bot_id} is paused by user`);
+      return {
+        action: 'REJECT',
+        confidence: 0.0,
+        reasoning: `Bot ${bot.bot_id} is paused by user`,
+        similarPastTrades: [],
+        kronos_alignment: 'UNAVAILABLE',
+      };
+    }
 
     if (!signal.hasSignal) {
       logger.tradeRejected('N/A', bot.bot_id, signal.asset, `No signal triggered (${signal.reasoning})`);

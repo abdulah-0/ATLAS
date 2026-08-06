@@ -33,6 +33,11 @@ export const AVAILABLE_MODELS: AvailableModel[] = [
 interface SettingsStore {
   settings: ATLASSettings;
 
+  // Global & Bot Trading Controls
+  toggleEngine: () => void;
+  toggleBotPause: (botId: string) => void;
+  isBotPaused: (botId: string) => boolean;
+
   // Model selection actions
   updateModelForTask: (taskKey: LLMTaskKey, modelId: string, tier?: 'premium' | 'mid' | 'cheap' | 'free', estCostUsd?: number) => void;
   resetModelToDefault: (taskKey: LLMTaskKey) => void;
@@ -60,8 +65,45 @@ export const useSettingsStore = create<SettingsStore>()(
         models: DEFAULT_MODEL_ASSIGNMENTS,
         conversion: DEFAULT_CONVERSION_SETTINGS,
         goal: DEFAULT_GOAL_SETTINGS,
+        isEngineRunning: true,
+        pausedBotIds: [],
         updatedAt: new Date().toISOString(),
         version: 1,
+      },
+
+      toggleEngine: () => {
+        set(state => ({
+          settings: {
+            ...state.settings,
+            isEngineRunning: !(state.settings.isEngineRunning ?? true),
+            updatedAt: new Date().toISOString(),
+            version: state.settings.version + 1,
+          },
+        }));
+      },
+
+      toggleBotPause: (botId) => {
+        set(state => {
+          const currentPaused = state.settings.pausedBotIds || [];
+          const isPaused = currentPaused.includes(botId);
+          const nextPaused = isPaused
+            ? currentPaused.filter(id => id !== botId)
+            : [...currentPaused, botId];
+
+          return {
+            settings: {
+              ...state.settings,
+              pausedBotIds: nextPaused,
+              updatedAt: new Date().toISOString(),
+              version: state.settings.version + 1,
+            },
+          };
+        });
+      },
+
+      isBotPaused: (botId) => {
+        const { settings } = get();
+        return (settings.pausedBotIds || []).includes(botId);
       },
 
       updateModelForTask: (taskKey, modelId, tier, estCostUsd) => {
@@ -168,6 +210,8 @@ export const useSettingsStore = create<SettingsStore>()(
             models: DEFAULT_MODEL_ASSIGNMENTS,
             conversion: DEFAULT_CONVERSION_SETTINGS,
             goal: DEFAULT_GOAL_SETTINGS,
+            isEngineRunning: true,
+            pausedBotIds: [],
             updatedAt: new Date().toISOString(),
             version: 1,
           },

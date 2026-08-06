@@ -66,7 +66,8 @@ export default function RootLayout() {
             paddingTop: 4,
             elevation: 8,
             flexDirection: 'row',
-            justifyContent: 'space-around',
+            justifyContent: 'space-evenly',
+            alignItems: 'center',
           },
         }}
       >

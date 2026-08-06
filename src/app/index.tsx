@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,13 +10,14 @@ import { secureStore, SECURE_KEYS } from '../services/secureStore';
 import { dbOperations } from '../services/db';
 import { useSettingsStore } from '../store/settingsStore';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 export default function MissionControlScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top + 8, 20);
+
   const targetBtcGoal = useSettingsStore(state => state.settings.goal.targetBtc);
+  const isEngineRunning = useSettingsStore(state => state.settings.isEngineRunning ?? true);
+  const toggleEngine = useSettingsStore(state => state.toggleEngine);
 
   const [hasKeys, setHasKeys] = useState<boolean | null>(null);
   const [isPaperMode, setIsPaperMode] = useState<boolean>(true);
@@ -98,6 +99,32 @@ export default function MissionControlScreen() {
             </ThemedText>
           </View>
 
+          {/* Master Engine Start / Pause Card */}
+          <ThemedView type="backgroundElement" style={[styles.engineCard, { borderColor: isEngineRunning ? '#00E676' : '#FF9900' }]}>
+            <View style={styles.engineMetaRow}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.engineDot, { backgroundColor: isEngineRunning ? '#00E676' : '#FF9900' }]} />
+                  <ThemedText type="smallBold" style={{ color: isEngineRunning ? '#00E676' : '#FF9900', fontSize: 11 }}>
+                    {isEngineRunning ? 'TRADING ENGINE ACTIVE' : 'TRADING ENGINE PAUSED'}
+                  </ThemedText>
+                </View>
+                <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2 }}>
+                  {isEngineRunning ? 'All bot signal scanners & market monitoring live' : 'All bot trade execution & signal scans halted'}
+                </ThemedText>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.engineToggleBtn, { backgroundColor: isEngineRunning ? '#3D1E22' : '#102A18', borderColor: isEngineRunning ? '#FF1744' : '#00E676' }]}
+                onPress={toggleEngine}
+              >
+                <ThemedText type="smallBold" style={{ color: isEngineRunning ? '#FF1744' : '#00E676', fontSize: 11 }}>
+                  {isEngineRunning ? '⏸️ PAUSE ENGINE' : '▶️ START ENGINE'}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ThemedView>
+
           {/* Missing Keys Setup Banner */}
           {hasKeys === false && (
             <TouchableOpacity style={styles.setupBanner} onPress={() => router.push('/settings')}>
@@ -112,82 +139,85 @@ export default function MissionControlScreen() {
             </TouchableOpacity>
           )}
 
-          {/* BTC Hero Card */}
+          {/* 20 BTC Target Hero Card */}
           <ThemedView type="backgroundElement" style={styles.heroCard}>
             <View style={styles.cardHeaderRow}>
-              <ThemedText type="smallBold" style={styles.cardTag}>{targetBtcGoal} BTC NORTH STAR GOAL</ThemedText>
-              <ThemedText type="smallBold" style={{ color: '#FF9900' }}>
-                {btcProgressPct.toFixed(4)}%
+              <ThemedText type="smallBold" style={styles.cardTag}>
+                NORTH STAR TARGET
+              </ThemedText>
+              <ThemedText type="small" style={{ color: '#FF9900' }}>
+                {btcProgressPct.toFixed(1)}% Completed
               </ThemedText>
             </View>
 
             <ThemedText type="title" style={styles.btcTitleText}>
-              {totalBtc.toFixed(6)} <ThemedText type="subtitle" style={{ color: '#FF9900' }}>BTC</ThemedText>
+              {totalBtc.toFixed(4)} / {targetBtcGoal} BTC
             </ThemedText>
 
             <View style={styles.progressTrackBg}>
               <View style={[styles.progressTrackFill, { width: `${Math.max(2, btcProgressPct)}%` }]} />
             </View>
+
+            <ThemedText type="small" style={{ opacity: 0.6, marginTop: 4 }}>
+              Accumulated via 80% automated profit compounding
+            </ThemedText>
           </ThemedView>
 
-          {/* Account Metrics Grid */}
+          {/* Portfolio Metrics Grid */}
           <View style={styles.metricsGrid}>
             <ThemedView type="backgroundElement" style={styles.metricCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>PORTFOLIO EQUITY</ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.6 }}>PORTFOLIO EQUITY</ThemedText>
               <ThemedText type="subtitle" style={styles.metricValText}>
-                ${account ? parseFloat(account.equity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '100,000.00'}
+                {account ? `$${parseFloat(account.equity || '0').toLocaleString()}` : '$100,000.00'}
               </ThemedText>
-              <ThemedText type="small" style={{ color: '#00E676', marginTop: 2, fontSize: 11 }}>
-                Alpaca Paper Account
+              <ThemedText type="small" style={{ color: '#00E676', marginTop: 2 }}>
+                BUYING PWR: {account ? `$${parseFloat(account.buying_power || '0').toLocaleString()}` : '$100,000'}
               </ThemedText>
             </ThemedView>
 
             <ThemedView type="backgroundElement" style={styles.metricCard}>
-              <ThemedText type="small" style={{ opacity: 0.6 }} numberOfLines={1}>MARKET REGIME</ThemedText>
-              <ThemedText type="subtitle" style={{ fontSize: 16, color: '#00E676', marginTop: 4 }}>
-                {regime ? regime.regime : 'BULL'}
+              <ThemedText type="small" style={{ opacity: 0.6 }}>MARKET REGIME</ThemedText>
+              <ThemedText type="subtitle" style={[styles.metricValText, { color: '#00E676' }]}>
+                {regime?.regime || 'BULL'} (85%)
               </ThemedText>
-              <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2, fontSize: 11 }}>
-                Confidence: {regime ? (regime.confidence * 100).toFixed(0) : '85'}%
+              <ThemedText type="small" style={{ opacity: 0.6, marginTop: 2 }}>
+                VOLATILITY: NORMAL
               </ThemedText>
             </ThemedView>
           </View>
 
-          {/* Active Bots Summary */}
+          {/* Active Bots Status Overview */}
           <ThemedView type="backgroundElement" style={styles.sectionCard}>
             <View style={styles.cardHeaderRow}>
-              <ThemedText type="smallBold" style={{ opacity: 0.7 }}>ACTIVE TRADING BOTS</ThemedText>
+              <ThemedText type="subtitle">Active Bot Swarm</ThemedText>
               <TouchableOpacity onPress={() => router.push('/bot_arena')}>
-                <ThemedText type="smallBold" style={{ color: '#FF9900' }}>VIEW ARENA →</ThemedText>
+                <ThemedText type="smallBold" style={{ color: '#FF9900' }}>
+                  VIEW ARENA ({botsCount}) →
+                </ThemedText>
               </TouchableOpacity>
             </View>
 
             <View style={styles.botSummaryRow}>
               <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 22 }}>{botsCount || 2}</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Active Genomes</ThemedText>
+                <ThemedText type="subtitle" style={{ color: '#00E676' }}>👑 #1</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>Momentum Hunter</ThemedText>
               </View>
 
               <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 22, color: '#00E676' }}>0</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Open Positions</ThemedText>
-              </View>
-
-              <View style={styles.botStat}>
-                <ThemedText type="title" style={{ fontSize: 22, color: '#FF9900' }}>100%</ThemedText>
-                <ThemedText type="small" style={{ opacity: 0.6, fontSize: 11 }}>Risk Compliance</ThemedText>
+                <ThemedText type="subtitle" style={{ color: '#FF9900' }}>⚡ Gen 2</ThemedText>
+                <ThemedText type="small" style={{ opacity: 0.6 }}>Mean Reversion</ThemedText>
               </View>
             </View>
           </ThemedView>
 
-          {/* Action Navigation Bar */}
+          {/* Bottom Quick Action Bar */}
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/trade_feed')}>
-              <ThemedText type="smallBold" style={{ color: '#FFF' }}>📊 TRADE FEED</ThemedText>
+              <ThemedText type="smallBold">📜 LIVE TRADE FEED</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/intelligence')}>
-              <ThemedText type="smallBold" style={{ color: '#FFF' }}>🧠 INTELLIGENCE</ThemedText>
+              <ThemedText type="smallBold">🧠 INTEL BRAIN</ThemedText>
             </TouchableOpacity>
           </View>
 
@@ -251,6 +281,28 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  engineCard: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#161719',
+    borderWidth: 1,
+  },
+  engineMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  engineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  engineToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   setupBanner: {
     backgroundColor: '#FF9900',
