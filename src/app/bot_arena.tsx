@@ -147,7 +147,7 @@ function BotArenaContent() {
             if (!bot || !bot.bot_id) return null;
 
             const isExpanded = expandedBotId === bot.bot_id;
-            const healthScore = Math.min(100, Math.max(0, Number(bot.performance?.win_rate ? bot.performance.win_rate * 100 : 85)));
+            const healthScore = 85;
             const isChampion = index === 0;
             const primaryAsset = String(bot.asset_universe?.[0] || 'BTC/USD');
             const isPaused = (pausedBotIds || []).includes(bot.bot_id) || !isEngineRunning;
