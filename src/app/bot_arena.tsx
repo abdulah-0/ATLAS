@@ -1,5 +1,5 @@
 import React, { Component, useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -7,6 +7,9 @@ import { BotGenome } from '../types/genome';
 import { SEED_GENOMES } from '../services/seedGenomes';
 import { dbOperations } from '../services/db';
 import { useSettingsStore } from '../store/settingsStore';
+
+// Static constant reference to prevent Zustand selector reference inequality loops
+const EMPTY_PAUSED_IDS: string[] = [];
 
 // Error Boundary to isolate and recover from any render error
 interface ErrorBoundaryState {
@@ -58,10 +61,13 @@ function BotArenaContent() {
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top + 8, 20);
 
-  const isEngineRunning = useSettingsStore(state => state.settings?.isEngineRunning ?? true);
+  const rawEngineRunning = useSettingsStore(state => state.settings.isEngineRunning);
   const toggleEngine = useSettingsStore(state => state.toggleEngine);
   const toggleBotPause = useSettingsStore(state => state.toggleBotPause);
-  const pausedBotIds = useSettingsStore(state => state.settings?.pausedBotIds || []);
+  const rawPausedBotIds = useSettingsStore(state => state.settings.pausedBotIds);
+
+  const isEngineRunning = rawEngineRunning ?? true;
+  const pausedBotIds = rawPausedBotIds ?? EMPTY_PAUSED_IDS;
 
   const [expandedBotId, setExpandedBotId] = useState<string | null>(null);
   const [bots, setBots] = useState<BotGenome[]>(SEED_GENOMES);
@@ -103,7 +109,7 @@ function BotArenaContent() {
     }
   };
 
-  const activeBotCount = Math.max(0, bots.length - (pausedBotIds?.length || 0));
+  const activeBotCount = Math.max(0, bots.length - pausedBotIds.length);
 
   return (
     <ThemedView style={styles.container}>
@@ -150,7 +156,7 @@ function BotArenaContent() {
             const healthScore = 85;
             const isChampion = index === 0;
             const primaryAsset = String(bot.asset_universe?.[0] || 'BTC/USD');
-            const isPaused = (pausedBotIds || []).includes(bot.bot_id) || !isEngineRunning;
+            const isPaused = pausedBotIds.includes(bot.bot_id) || !isEngineRunning;
             const signalType = String(bot.entry?.primary_signal || 'momentum');
             const timeframe = String(bot.preferred_timeframe || '15min');
             const botTitle = String(bot.nickname || bot.bot_id);
