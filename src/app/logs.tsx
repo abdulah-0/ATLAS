@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
 import { useLogsStore } from '../store/logsStore';
 import { LogCategory, LogLevel, LogEvent } from '../types/logs';
+import { tradingLoop } from '../services/tradingLoop';
 import { Screen } from '../components/layout/Screen';
 import { Card } from '../components/layout/Card';
 import { Row } from '../components/layout/Row';
@@ -21,11 +22,31 @@ export default function LogsScreen() {
   const [selectedCategory, setSelectedCategory] = useState<LogCategory | 'ALL'>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | 'ALL'>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [isScanningNow, setIsScanningNow] = useState<boolean>(false);
 
   useEffect(() => {
     loadLogs();
     markAllRead();
   }, []);
+
+  // 3-second auto-refresh polling loop when autoRefresh is enabled
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const timer = setInterval(() => {
+      loadLogs();
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [autoRefresh]);
+
+  const handleManualScan = async () => {
+    setIsScanningNow(true);
+    await tradingLoop.runScanCycle();
+    await loadLogs();
+    setIsScanningNow(false);
+  };
 
   const categories: (LogCategory | 'ALL')[] = [
     'ALL',
@@ -53,14 +74,47 @@ export default function LogsScreen() {
     <Screen scroll padded>
       <Stack gap={12} style={{ paddingTop: 8 }}>
         {/* Header */}
-        <Stack gap={2}>
-          <Text variant="label" color="muted">
-            REAL-TIME SYSTEM AUDIT TRAIL
-          </Text>
-          <Text variant="h1" color="white">
-            System Event Logs
-          </Text>
-        </Stack>
+        <Row justify="space-between" align="flex-start">
+          <Stack gap={2} style={{ flex: 1 }}>
+            <Text variant="label" color="muted">
+              REAL-TIME SYSTEM AUDIT TRAIL
+            </Text>
+            <Text variant="h1" color="white">
+              System Event Logs
+            </Text>
+          </Stack>
+
+          <TouchableOpacity
+            style={[styles.autoRefreshBtn, autoRefresh ? styles.autoRefreshActive : styles.autoRefreshInactive]}
+            onPress={() => setAutoRefresh(!autoRefresh)}
+          >
+            <Row gap={4} align="center">
+              <View style={[styles.pulseDot, { backgroundColor: autoRefresh ? '#00E676' : '#FF9100' }]} />
+              <Text variant="caption" color={autoRefresh ? 'green' : 'secondary'} style={{ fontSize: 10, fontWeight: 'bold' }}>
+                {autoRefresh ? 'LIVE (3s)' : 'PAUSED'}
+              </Text>
+            </Row>
+          </TouchableOpacity>
+        </Row>
+
+        {/* Controls Bar */}
+        <Row gap={8} justify="space-between">
+          <TouchableOpacity
+            style={styles.scanBtn}
+            onPress={handleManualScan}
+            disabled={isScanningNow}
+          >
+            <Text variant="caption" color="white" style={{ fontWeight: 'bold' }}>
+              {isScanningNow ? '⚡ SCANNING MARKET...' : '▶️ RUN SCAN CYCLE NOW'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.refreshBtn} onPress={() => loadLogs()}>
+            <Text variant="caption" color="gold" style={{ fontWeight: 'bold' }}>
+              🔄 REFRESH
+            </Text>
+          </TouchableOpacity>
+        </Row>
 
         {/* Category Filter Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -99,9 +153,16 @@ export default function LogsScreen() {
         {/* Log Feed */}
         {filteredLogs.length === 0 ? (
           <Card variant="default" style={styles.emptyCard}>
-            <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
-              No log events recorded matching the selected filter.
-            </Text>
+            <Stack gap={8} align="center">
+              <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
+                No log events recorded matching the selected filter.
+              </Text>
+              <TouchableOpacity style={styles.scanBtn} onPress={handleManualScan}>
+                <Text variant="caption" color="white" style={{ fontWeight: 'bold' }}>
+                  ▶️ RUN FIRST SCAN CYCLE
+                </Text>
+              </TouchableOpacity>
+            </Stack>
           </Card>
         ) : (
           filteredLogs.map((item: LogEvent) => {
@@ -156,6 +217,44 @@ export default function LogsScreen() {
 }
 
 const styles = StyleSheet.create({
+  autoRefreshBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  autoRefreshActive: {
+    backgroundColor: '#102A18',
+    borderColor: '#00E676',
+  },
+  autoRefreshInactive: {
+    backgroundColor: '#21262D',
+    borderColor: '#30363D',
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  scanBtn: {
+    flex: 1,
+    backgroundColor: '#2A2010',
+    borderColor: '#FF9900',
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  refreshBtn: {
+    backgroundColor: '#21262D',
+    borderColor: '#30363D',
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
   filterChip: {
     paddingHorizontal: 10,
     paddingVertical: 4,

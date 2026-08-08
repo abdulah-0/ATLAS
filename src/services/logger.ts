@@ -35,6 +35,74 @@ function emit(partial: Omit<LogEvent, 'id' | 'timestamp' | 'is_read'>): LogEvent
 }
 
 export const logger = {
+  info: (category: LogCategory, title: string, detail?: string) =>
+    emit({
+      level: 'info',
+      category,
+      title,
+      detail,
+    }),
+
+  success: (category: LogCategory, title: string, detail?: string) =>
+    emit({
+      level: 'success',
+      category,
+      title,
+      detail,
+    }),
+
+  warning: (category: LogCategory, title: string, detail?: string) =>
+    emit({
+      level: 'warning',
+      category,
+      title,
+      detail,
+    }),
+
+  systemInfo: (title: string, detail?: string) =>
+    emit({
+      level: 'system',
+      category: 'system',
+      title,
+      detail,
+    }),
+
+  tradeExecuted: (tradeId: string, botId: string, asset: string, direction: string, price: number, qty: number) =>
+    emit({
+      level: 'success',
+      category: 'execution',
+      trade_id: tradeId,
+      bot_id: botId,
+      asset,
+      title: `${direction} ${qty} ${asset} @ $${price.toFixed(2)}`,
+      detail: `Trade ID: ${tradeId} | Bot: ${botId}`,
+    }),
+
+  signalEvaluated: (botId: string, asset: string, hasSignal: boolean, confidence: number, reasoning: string) =>
+    emit({
+      level: hasSignal ? 'info' : 'system',
+      category: 'signal',
+      bot_id: botId,
+      asset,
+      title: `Signal [${botId} / ${asset}]: ${hasSignal ? 'TRIGGERED 🟢' : 'NO SIGNAL ⚪'} (${(confidence * 100).toFixed(0)}%)`,
+      detail: reasoning,
+    }),
+
+  riskLimitTriggered: (reason: string, action: string) =>
+    emit({
+      level: 'warning',
+      category: 'risk',
+      title: `Risk Boundary Fired: ${action}`,
+      detail: reason,
+    }),
+
+  regimeShift: (from: string, to: string, confidence: number) =>
+    emit({
+      level: 'info',
+      category: 'regime',
+      title: `Regime Shift: ${from} → ${to} (${(confidence * 100).toFixed(0)}% conf)`,
+    }),
+
   tradeApproved: (tradeId: string, botId: string, asset: string, decision: any) =>
     emit({
       level: 'success',
@@ -42,7 +110,7 @@ export const logger = {
       trade_id: tradeId,
       bot_id: botId,
       asset,
-      title: `${asset} ${decision.action || 'APPROVED'} — conf ${( (decision.confidence || 0.85) * 100).toFixed(0)}%`,
+      title: `${asset} ${decision.action || 'APPROVED'} — conf ${((decision.confidence || 0.85) * 100).toFixed(0)}%`,
       detail: JSON.stringify(
         {
           bull_case: decision.bull_case,

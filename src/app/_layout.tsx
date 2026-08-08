@@ -13,6 +13,7 @@ import {
 } from 'lucide-react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useLogsStore } from '../store/logsStore';
+import { tradingLoop } from '../services/tradingLoop';
 
 interface TabIconProps {
   Icon: LucideIcon;
@@ -42,6 +43,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     loadLogs();
+    tradingLoop.start(20000);
   }, []);
 
   return (
