@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity } from 'react-native';
+import React, { Component, useState, useEffect } from 'react';
+import { StyleSheet, ScrollView, View, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,7 +8,53 @@ import { SEED_GENOMES } from '../services/seedGenomes';
 import { dbOperations } from '../services/db';
 import { useSettingsStore } from '../store/settingsStore';
 
-export default function BotArenaScreen() {
+// Error Boundary to isolate and recover from any render error
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string;
+}
+
+class BotArenaErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, errorMessage: '' };
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, errorMessage: error?.message || 'Unknown render error' };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.warn('BotArena ErrorBoundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <ThemedView style={styles.container}>
+          <SafeAreaView style={styles.safeArea}>
+            <View style={{ flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+              <ThemedText type="smallBold" style={{ color: '#FF1744', fontSize: 18 }}>
+                ⚠️ Bot Arena Recovery Mode
+              </ThemedText>
+              <ThemedText type="small" style={{ opacity: 0.7, textAlign: 'center' }}>
+                An isolated UI event occurred: {this.state.errorMessage}
+              </ThemedText>
+              <TouchableOpacity
+                style={{ backgroundColor: '#21262D', borderWidth: 1, borderColor: '#30363D', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, marginTop: 10 }}
+                onPress={() => this.setState({ hasError: false, errorMessage: '' })}
+              >
+                <ThemedText type="smallBold" style={{ color: '#FF9900' }}>
+                  RELOAD BOT ARENA
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </ThemedView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function BotArenaContent() {
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top + 8, 20);
 
@@ -33,13 +79,15 @@ export default function BotArenaScreen() {
           try {
             if (row.genome) {
               const g = typeof row.genome === 'string' ? JSON.parse(row.genome) : row.genome;
-              if (g && g.bot_id) {
-                parsed.push(g);
+              const botId = g?.bot_id || g?.id || row?.id || row?.bot_id;
+              if (g && botId) {
+                parsed.push({ ...g, bot_id: botId });
                 continue;
               }
             }
-            if (row.bot_id) {
-              const seed = SEED_GENOMES.find(s => s.bot_id === row.bot_id);
+            const rowId = row?.id || row?.bot_id;
+            if (rowId) {
+              const seed = SEED_GENOMES.find(s => s.bot_id === rowId);
               if (seed) parsed.push(seed);
             }
           } catch (parseErr) {
@@ -99,12 +147,13 @@ export default function BotArenaScreen() {
             if (!bot || !bot.bot_id) return null;
 
             const isExpanded = expandedBotId === bot.bot_id;
-            const healthScore = 85;
+            const healthScore = Math.min(100, Math.max(0, Number(bot.performance?.win_rate ? bot.performance.win_rate * 100 : 85)));
             const isChampion = index === 0;
-            const primaryAsset = bot.asset_universe?.[0] || 'BTC/USD';
+            const primaryAsset = String(bot.asset_universe?.[0] || 'BTC/USD');
             const isPaused = (pausedBotIds || []).includes(bot.bot_id) || !isEngineRunning;
-            const signalType = bot.entry?.primary_signal || 'momentum';
-            const timeframe = bot.preferred_timeframe || '15min';
+            const signalType = String(bot.entry?.primary_signal || 'momentum');
+            const timeframe = String(bot.preferred_timeframe || '15min');
+            const botTitle = String(bot.nickname || bot.bot_id);
 
             return (
               <TouchableOpacity
@@ -130,8 +179,8 @@ export default function BotArenaScreen() {
                         </ThemedText>
                       </View>
 
-                      <ThemedText type="subtitle" style={styles.botTitleText} numberOfLines={1}>
-                        {bot.nickname || bot.bot_id} ({bot.bot_id})
+                      <ThemedText type="default" style={[styles.botTitleText, { fontWeight: '700', fontSize: 16 }]} numberOfLines={1}>
+                        {botTitle} ({bot.bot_id})
                       </ThemedText>
                     </View>
 
@@ -181,18 +230,18 @@ export default function BotArenaScreen() {
                       <View style={styles.divider} />
                       <ThemedText type="smallBold" style={{ color: '#FF9900' }}>ENTRY RULES & CONFLUENCE</ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8, marginTop: 2 }}>
-                        • Primary Signal: {String(bot.entry?.primary_signal || 'N/A')}
+                        {`• Primary Signal: ${String(bot.entry?.primary_signal || 'N/A')}`}
                       </ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8 }}>
-                        • Min Signal Confidence: {bot.entry?.min_confidence ?? 0.65}
+                        {`• Min Signal Confidence: ${String(bot.entry?.min_confidence ?? 0.65)}`}
                       </ThemedText>
 
                       <ThemedText type="smallBold" style={{ color: '#FF9900', marginTop: 8 }}>EXIT & RISK BOUNDARIES</ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8, marginTop: 2 }}>
-                        • Stop Loss: {(bot.exit?.stop_loss_pct ? bot.exit.stop_loss_pct * 100 : 1.5).toFixed(1)}%
+                        {`• Stop Loss: ${(bot.exit?.stop_loss_pct ? bot.exit.stop_loss_pct * 100 : 1.5).toFixed(1)}%`}
                       </ThemedText>
                       <ThemedText type="small" style={{ opacity: 0.8 }}>
-                        • Take Profit R:R: 1:{bot.exit?.take_profit_rr || 2.5}
+                        {`• Take Profit R:R: 1:${String(bot.exit?.take_profit_rr || 2.5)}`}
                       </ThemedText>
                     </View>
                   )}
@@ -205,6 +254,14 @@ export default function BotArenaScreen() {
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
+  );
+}
+
+export default function BotArenaScreen() {
+  return (
+    <BotArenaErrorBoundary>
+      <BotArenaContent />
+    </BotArenaErrorBoundary>
   );
 }
 
